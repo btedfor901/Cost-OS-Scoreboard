@@ -163,11 +163,12 @@
     .lb-title  { font-size: 0.875rem; font-weight: 600; }
     .lb-badge  { font-size: 0.7rem; color: var(--dim); background: var(--raised); padding: 0.15rem 0.5rem; border-radius: 9999px; }
 
-    .rep-row { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 0; border-radius: 0.5rem; }
+    .rep-row {
+      display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 0;
+      border-radius: 0.5rem; cursor: pointer; transition: background .15s;
+    }
+    .rep-row:hover { background: var(--raised); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
     .rep-row + .rep-row { border-top: 1px solid var(--border); }
-    .rep-row.gold   { background: rgba(251,191,36,.06);  margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-top: none !important; border-bottom: 1px solid rgba(251,191,36,.15); margin-bottom: 2px; }
-    .rep-row.silver { background: rgba(148,163,184,.04); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
-    .rep-row.bronze { background: rgba(180,120,60,.04);  margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
 
     .rank-dot {
       width: 1.5rem; height: 1.5rem; border-radius: 50%; flex-shrink: 0;
@@ -175,9 +176,9 @@
       font-size: 0.68rem; font-weight: 800;
       background: var(--raised); color: var(--dim);
     }
-    .rank-dot.r1 { background: #f59e0b; color: #fff; box-shadow: 0 0 8px rgba(245,158,11,.4); }
-    .rank-dot.r2 { background: #94a3b8; color: #fff; }
-    .rank-dot.r3 { background: #c8844a; color: #fff; }
+    .rank-dot.r1 { background: var(--brand); color: #fff; box-shadow: 0 0 10px rgba(12,125,198,.45); }
+    .rank-dot.r2 { background: #1e3a5f; color: #7fb3d9; }
+    .rank-dot.r3 { background: #162b42; color: #5a90bb; }
 
     .avatar {
       width: 2rem; height: 2rem; border-radius: 50%; flex-shrink: 0;
@@ -230,6 +231,52 @@
     .btn-sec { padding: 0.45rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--raised); color: var(--sub); font-family: inherit; font-size: 0.8rem; cursor: pointer; }
     .btn-pri { padding: 0.45rem 1rem; border-radius: 0.5rem; border: none; background: var(--brand); color: #fff; font-family: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer; }
 
+    /* ── Rep Stats Modal ── */
+    .rep-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.72);
+      display: flex; align-items: center; justify-content: center; z-index: 300;
+    }
+    .rep-modal-overlay.hidden { display: none; }
+    .rep-modal {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 1rem; padding: 1.5rem;
+      width: 100%; max-width: 440px; margin: 1rem;
+    }
+    .rmo-header {
+      display: flex; align-items: center; gap: 0.875rem; margin-bottom: 1.25rem;
+    }
+    .rmo-avatar {
+      width: 3rem; height: 3rem; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; font-weight: 700; color: #fff;
+    }
+    .rmo-name { flex: 1; }
+    .rmo-name strong { display: block; font-size: 1.1rem; font-weight: 700; }
+    .rmo-name small  { font-size: 0.72rem; color: var(--sub); }
+    .rmo-close {
+      width: 2rem; height: 2rem; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--raised); color: var(--sub);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1.125rem; flex-shrink: 0; line-height: 1;
+    }
+    .rmo-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.625rem; margin-bottom: 0.875rem; }
+    .rmo-stat { background: var(--raised); border-radius: 0.625rem; padding: 0.875rem 0.75rem; text-align: center; }
+    .rms-label { font-size: 0.65rem; color: var(--sub); margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: .03em; }
+    .rms-value { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--brand); margin-bottom: 0.2rem; }
+    .rms-rank  { font-size: 0.65rem; color: var(--dim); margin-bottom: 0.2rem; }
+    .rms-diff  { font-size: 0.68rem; font-weight: 600; }
+    .rms-diff.pos { color: #10b981; }
+    .rms-diff.neg { color: #ef4444; }
+    .rms-diff.neu { color: var(--dim); }
+    .rmo-breakdown { background: var(--raised); border-radius: 0.625rem; padding: 1rem 1.125rem; }
+    .rmb-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.875rem; }
+    .rmb-row   { margin-bottom: 0.75rem; }
+    .rmb-row:last-child { margin-bottom: 0; }
+    .rmb-row-hd { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--sub); margin-bottom: 0.3rem; }
+    .rmb-pct    { color: var(--text); font-weight: 600; }
+    .rmb-track  { height: 0.375rem; background: var(--border); border-radius: 9999px; overflow: hidden; }
+    .rmb-fill   { height: 100%; border-radius: 9999px; background: var(--brand); transition: width .4s ease; }
+
     /* ── Hidden / empty states ── */
     .unavailable { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 55vh; gap: 0.875rem; color: var(--dim); text-align: center; padding: 2rem; }
     .unavailable h2 { font-size: 1.125rem; font-weight: 500; color: var(--sub); }
@@ -268,6 +315,10 @@
   </div>
 </header>
 
+<div class="rep-modal-overlay hidden" id="repModalOverlay" onclick="closeRepModal(event)">
+  <div class="rep-modal" id="repModal"></div>
+</div>
+
 <div class="main" id="main">
   <div class="loading">Loading…</div>
 </div>
@@ -276,6 +327,7 @@
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 let DATA       = null;
+let REPS_DATA  = null;
 let activeTab  = 'today';
 let avgMode    = 'talk';
 let displayOn  = true;
@@ -410,15 +462,16 @@ function render() {
   const maxCall = byCall[0]?.totalCalls || 1;
   const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
 
+  // Store for modal access
+  REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
+
   function repRow(r, rank, value, maxVal, isTime) {
-    const pct      = Math.round((value / maxVal) * 100);
-    const color    = avatarColor(r.name);
-    const disp     = isTime ? fmtSec(value) : value.toLocaleString();
-    const rankCls  = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
-    const rowCls   = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-    const valColor = rank === 1 ? '#f59e0b' : rank === 2 ? '#94a3b8' : rank === 3 ? '#c8844a' : '';
-    const valStyle = valColor ? `style="color:${valColor}"` : '';
-    return `<div class="rep-row ${rowCls}">
+    const pct     = Math.round((value / maxVal) * 100);
+    const color   = avatarColor(r.name);
+    const disp    = isTime ? fmtSec(value) : value.toLocaleString();
+    const rankCls = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
+    const safeName = r.name.replace(/'/g, "\\'");
+    return `<div class="rep-row" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
       <div class="rep-mid">
@@ -427,7 +480,7 @@ function render() {
           <div class="rep-bar-fill" style="width:${pct}%;background:${color}"></div>
         </div>
       </div>
-      <div class="rep-val${isTime ? ' accent' : ''}" ${valStyle}>${disp}</div>
+      <div class="rep-val accent">${disp}</div>
     </div>`;
   }
 
@@ -520,6 +573,98 @@ function applyCustom() {
   customFrom = document.getElementById('cfrom')?.value || '';
   customTo   = document.getElementById('cto')?.value   || '';
   if (DATA) render();
+}
+
+// ── Rep stats modal ───────────────────────────────────────────────────────────
+function openRepModal(name) {
+  if (!REPS_DATA) return;
+  const { reps, byCall, byTalk, totalCalls, totalTalk } = REPS_DATA;
+  const rep = reps.find(r => r.name === name);
+  if (!rep) return;
+
+  const n = reps.length || 1;
+  const teamAvgCalls   = totalCalls / n;
+  const teamAvgTalk    = totalTalk  / n;
+  const teamAvgPerCall = totalCalls ? Math.round(totalTalk / totalCalls) : 0;
+
+  const callRank  = byCall.findIndex(r => r.name === name) + 1;
+  const talkRank  = byTalk.findIndex(r => r.name === name) + 1;
+  const avgSorted = [...reps].sort((a, b) => b.avgTalkTimeSec - a.avgTalkTimeSec);
+  const avgRank   = avgSorted.findIndex(r => r.name === name) + 1;
+
+  const callDiff = rep.totalCalls - teamAvgCalls;
+  const talkDiff = rep.totalTalkTimeSec - teamAvgTalk;
+  const avgDiff  = rep.avgTalkTimeSec - teamAvgPerCall;
+
+  function diffLabel(val, isTime) {
+    const sign = val >= 0 ? '+' : '-';
+    const abs  = Math.abs(Math.round(val));
+    return sign + (isTime ? fmtSec(abs) : abs);
+  }
+  function cls(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
+
+  const maxCall = byCall[0]?.totalCalls      || 1;
+  const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
+  const maxAvg  = avgSorted[0]?.avgTalkTimeSec || 1;
+
+  const callPct = Math.round(rep.totalCalls       / maxCall * 100);
+  const talkPct = Math.round(rep.totalTalkTimeSec / maxTalk * 100);
+  const avgPct  = Math.round(rep.avgTalkTimeSec   / maxAvg  * 100);
+
+  const color = avatarColor(name);
+
+  document.getElementById('repModal').innerHTML = `
+    <div class="rmo-header">
+      <div class="rmo-avatar" style="background:${color}">${initials(name)}</div>
+      <div class="rmo-name">
+        <strong>${name}</strong>
+        <small>Daily Performance Analytics</small>
+      </div>
+      <button class="rmo-close" onclick="closeRepModal()">×</button>
+    </div>
+    <div class="rmo-stats">
+      <div class="rmo-stat">
+        <div class="rms-label">Total Calls</div>
+        <div class="rms-value">${rep.totalCalls}</div>
+        <div class="rms-rank">Rank #${callRank} of ${n}</div>
+        <div class="rms-diff ${cls(callDiff)}">${diffLabel(callDiff, false)} vs team avg</div>
+      </div>
+      <div class="rmo-stat">
+        <div class="rms-label">Talk Time</div>
+        <div class="rms-value" style="font-size:1rem">${fmtSec(rep.totalTalkTimeSec)}</div>
+        <div class="rms-rank">Rank #${talkRank} of ${n}</div>
+        <div class="rms-diff ${cls(talkDiff)}">${diffLabel(talkDiff, true)} vs team avg</div>
+      </div>
+      <div class="rmo-stat">
+        <div class="rms-label">Avg Per Call</div>
+        <div class="rms-value">${fmtSec(rep.avgTalkTimeSec)}</div>
+        <div class="rms-rank">Rank #${avgRank} of ${n}</div>
+        <div class="rms-diff ${cls(avgDiff)}">${diffLabel(avgDiff, true)} vs team avg</div>
+      </div>
+    </div>
+    <div class="rmo-breakdown">
+      <div class="rmb-title">Efficiency Breakdown</div>
+      <div class="rmb-row">
+        <div class="rmb-row-hd"><span>Calls vs Team Avg</span><span class="rmb-pct">${callPct}%</span></div>
+        <div class="rmb-track"><div class="rmb-fill" style="width:${callPct}%"></div></div>
+      </div>
+      <div class="rmb-row">
+        <div class="rmb-row-hd"><span>Talk Time vs Team Avg</span><span class="rmb-pct">${talkPct}%</span></div>
+        <div class="rmb-track"><div class="rmb-fill" style="width:${talkPct}%"></div></div>
+      </div>
+      <div class="rmb-row">
+        <div class="rmb-row-hd"><span>Avg Call Duration</span><span class="rmb-pct">${avgPct}%</span></div>
+        <div class="rmb-track"><div class="rmb-fill" style="width:${avgPct}%"></div></div>
+      </div>
+    </div>`;
+
+  document.getElementById('repModalOverlay').classList.remove('hidden');
+}
+
+function closeRepModal(e) {
+  if (!e || e.target === document.getElementById('repModalOverlay')) {
+    document.getElementById('repModalOverlay').classList.add('hidden');
+  }
 }
 
 // ── Admin modal ───────────────────────────────────────────────────────────────
