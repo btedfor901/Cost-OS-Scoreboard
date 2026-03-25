@@ -67,8 +67,6 @@
     }
     .pin-submit:hover { background: var(--brand-h); }
 
-    /* ── Dashboard ── */
-    #dashboard { display: none; }
 
     .topbar {
       background: color-mix(in srgb, var(--card) 80%, transparent);
@@ -244,19 +242,6 @@
 </head>
 <body>
 
-<!-- ── PIN Gate ── -->
-<div id="pinGate">
-  <div class="pin-card">
-    <div class="pin-logo">C</div>
-    <h1>Cost·<span>OS</span></h1>
-    <p>Enter your admin PIN to access the control panel.</p>
-    <input class="pin-input" type="password" id="pinInput" placeholder="••••••••"
-           onkeydown="if(event.key==='Enter')doPin()" autocomplete="off" />
-    <div class="pin-err" id="pinErr"></div>
-    <button class="pin-submit" onclick="doPin()">Unlock Admin Panel</button>
-  </div>
-</div>
-
 <!-- ── Dashboard ── -->
 <div id="dashboard">
   <div class="topbar">
@@ -386,10 +371,9 @@
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-let PIN      = sessionStorage.getItem('cp') || '';
-let DATA     = null;
-let dispOn   = true;
-let metric   = 'calls';
+let DATA      = null;
+let dispOn    = true;
+let metric    = 'calls';
 let chartInst = null;
 
 const COLORS = ['#1271af','#0d9488','#7c3aed','#d97706','#dc2626','#059669'];
@@ -408,34 +392,6 @@ function toggleTheme() {
   document.getElementById('moonIcon').style.display = t === 'light' ? '' : 'none';
   if (chartInst) { chartInst.destroy(); chartInst = null; }
   if (DATA) renderChart();
-}
-
-// ── PIN ───────────────────────────────────────────────────────────────────────
-async function doPin() {
-  const pin = document.getElementById('pinInput').value.trim();
-  if (!pin) return;
-  try {
-    const r = await fetch('/api/verify-pin', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pin }),
-    });
-    if (r.status === 403) {
-      document.getElementById('pinErr').textContent = 'Incorrect PIN — try again.';
-      document.getElementById('pinInput').value = '';
-      document.getElementById('pinInput').focus();
-      return;
-    }
-    const d = await r.json();
-    PIN    = pin;
-    dispOn = d.displayOn;
-    sessionStorage.setItem('ca', '1');
-    sessionStorage.setItem('cp', pin);
-    document.getElementById('pinGate').style.display    = 'none';
-    document.getElementById('dashboard').style.display  = '';
-    init();
-  } catch(e) {
-    document.getElementById('pinErr').textContent = 'Connection error.';
-  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -500,9 +456,8 @@ async function doScrape() {
   try {
     const r = await fetch('/api/scrape-now', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pin: PIN }),
+      body: JSON.stringify({}),
     });
-    if (r.status === 403) { res.textContent = 'PIN rejected.'; return; }
     const d = await r.json();
     if (d.started) {
       res.textContent = 'Scrape started — refreshing data in 10 seconds…';
@@ -529,7 +484,7 @@ async function setDisplay(on) {
   try {
     const r = await fetch('/api/toggle', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pin: PIN, on }),
+      body: JSON.stringify({ on }),
     });
     if (!r.ok) { showToast('PIN rejected', 'error'); return; }
     const d = await r.json();
@@ -664,25 +619,7 @@ function showToast(msg, type = 'success') {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-// Auto-restore session if PIN is saved
-if (sessionStorage.getItem('ca') === '1' && PIN) {
-  // Verify PIN is still valid
-  fetch('/api/verify-pin', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ pin: PIN }),
-  }).then(r => {
-    if (r.ok) {
-      return r.json().then(d => {
-        dispOn = d.displayOn;
-        document.getElementById('pinGate').style.display   = 'none';
-        document.getElementById('dashboard').style.display = '';
-        init();
-      });
-    }
-  }).catch(() => {});
-} else {
-  setTimeout(() => document.getElementById('pinInput')?.focus(), 100);
-}
+init();
 
 // Theme icon init
 (function() {

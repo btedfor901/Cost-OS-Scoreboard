@@ -198,261 +198,80 @@ def parse_talk_time_str(s):
 
 
 def parse_response(data):
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    # Print raw structure for debugging
+    """
+    Parse the Nextiva API response and return a dict of {date_str: [rep_dict]}
+    covering ALL dates with data — not just today.
+    """
     raw = json.dumps(data)
-    print(f"  Raw response (first 600 chars):\n  {raw[:600]}")
+    print(f"  Raw response (first 400 chars):\n  {raw[:400]}")
 
-    # ── Strategy: Nextiva wrapped format with results + filters.users ──────────
-    # {"results": [{"data": [{"category":"2026-03-25","Total":53,...}]}, ...],
-    #  "filters": {"users": ["email1@nextiva.com", ...]},
-    #  "labels": {"users": {"email1": "Galen Urbanski", ...}}}
-    if isinstance(data, dict) and isinstance(data.get("results"), list):
-        results_list = data["results"]
-        user_emails  = data.get("filters", {}).get("users", [])
-        labels_map   = data.get("labels", {})
+    if not (isinstance(data, dict) and isinstance(data.get("results"), list)):
+        print("  Unexpected response format — 'results' list not found.")
+        return {}
 
-        # labels may be {"users": {"email": "Name"}} or {"email": "Name"}
-        user_labels = {}
-        if isinstance(labels_map, dict):
-            ul = labels_map.get("users", labels_map)
-            if isinstance(ul, dict):
-                user_labels = ul
+    results_list = data["results"]
+    user_emails  = data.get("filters", {}).get("users", [])
 
-        print(f"  results list length: {len(results_list)}")
-        print(f"  user_emails: {user_emails}")
-        print(f"  user_labels: {user_labels}")
-        if results_list:
-            print(f"  results[0] keys: {list(results_list[0].keys()) if isinstance(results_list[0], dict) else type(results_list[0])}")
+    # {date: {rep_name: (calls, talk_sec)}}
+    date_map = {}
 
-        reps = []
-        for i, series in enumerate(results_list):
-            if not isinstance(series, dict):
-                continue
+    for i, series in enumerate(results_list):
+        if not isinstance(series, dict):
+            continue
 
-            # Try to get name: series fields → meta.tableLabels → meta fields → email prefix
-            meta = series.get("meta", {}) if isinstance(series.get("meta"), dict) else {}
-            table_labels = meta.get("tableLabels", [])
-            if isinstance(table_labels, list) and table_labels:
-                name = str(table_labels[0]).strip()
-            else:
-                name = str(series.get("name", series.get("agentName",
-                            series.get("label",
-                            meta.get("name", meta.get("displayName",
-                            meta.get("fullName", meta.get("agentName", "")))))))).strip()
-            if not name and i < len(user_emails):
-                email = user_emails[i]
-                name = email.split("@")[0]
-            if not name:
-                name = f"Rep {i+1}"
-
-            rows = series.get("data", series.get("rows", series.get("values", [])))
-            calls = 0; talk_sec = 0
-
-            # Find today's row, fall back to most recent non-zero
-            today_row = None
-            for row in rows:
-                if isinstance(row, dict) and str(row.get("category","")).strip() == today_str:
-                    today_row = row
-                    break
-            if not today_row:
-                for row in reversed(rows):
-                    if isinstance(row, dict):
-                        c = row.get("Total", row.get("calls", 0))
-                        try:
-                            if int(c) > 0:
-                                today_row = row
-                                break
-                        except Exception:
-                            pass
-
-            if today_row:
-                c = today_row.get("Total", today_row.get("calls", 0))
-                t = today_row.get("Total talk time", today_row.get("talkTime",
-                    today_row.get("totalTalkTimeSec", 0)))
-                try: calls = int(c)
-                except: calls = 0
-                if isinstance(t, str):
-                    talk_sec = parse_talk_time_str(t)
-                else:
-                    try: talk_sec = int(t)
-                    except: talk_sec = 0
-
-            if calls > 0:
-                reps.append(make_rep(name, calls, talk_sec))
-
-        if reps:
-            print(f"  Parsed {len(reps)} rep(s) (Nextiva results+filters format)")
-            return reps
+        # Get rep display name from meta.tableLabels
+        meta = series.get("meta", {}) if isinstance(series.get("meta"), dict) else {}
+        tl   = meta.get("tableLabels", [])
+        if isinstance(tl, list) and tl:
+            name = str(tl[0]).strip()
         else:
-            print(f"  results format matched but 0 reps had calls today (results had {len(results_list)} series)")
+            name = str(series.get("name", series.get("agentName", ""))).strip()
+        if not name and i < len(user_emails):
+            name = user_emails[i].split("@")[0]
+        if not name:
+            name = f"Rep {i+1}"
 
-    # ── Unwrap top-level wrapper keys ────────────────────────────────────────
-    # The Nextiva API wraps data in keys like 'results', 'data', 'report', etc.
-    if isinstance(data, dict):
-        for wrapper_key in ("results", "data", "rows", "report", "records", "items"):
-            inner = data.get(wrapper_key)
-            if isinstance(inner, (list, dict)):
-                print(f"  Unwrapping top-level key: '{wrapper_key}'")
-                raw2 = json.dumps(inner)
-                print(f"  Unwrapped '{wrapper_key}' (first 800 chars):\n  {raw2[:800]}")
-                result = _try_parse(inner, today_str)
-                if result:
-                    return result
-        # Also try the whole dict as-is (for dict-keyed-by-rep format)
-        result = _try_parse(data, today_str)
-        if result:
-            return result
-    elif isinstance(data, list):
-        result = _try_parse(data, today_str)
-        if result:
-            return result
-
-    print("  Could not match any known response format.")
-    return []
-
-
-def _try_parse(data, today_str):  # noqa: C901
-    # ── Strategy 0: flat list of per-rep summary dicts ────────────────────────
-    # [{"name": "Galen Urbanski", "totalCalls": 53, "talkTime": 3718}, ...]
-    NAME_KEYS = ("name", "agentName", "agent", "user", "userName",
-                 "displayName", "fullName", "repName", "label")
-    CALL_KEYS = ("totalCalls", "calls", "Total", "total_calls",
-                 "inboundCalls", "outboundCalls", "callCount")
-    TALK_KEYS = ("totalTalkTimeSec", "talkTime", "talk_time", "duration",
-                 "talkTimeSec", "Total talk time")
-
-    def first_val(d, keys, default=0):
-        for k in keys:
-            if k in d:
-                return d[k]
-        return default
-
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        reps = []
-        for rec in data:
-            name = str(first_val(rec, NAME_KEYS, "")).strip()
-            if not name or is_date_string(name):
+        # Walk every date row — collect ALL of them
+        for row in series.get("data", series.get("rows", [])):
+            if not isinstance(row, dict):
                 continue
-            calls_raw = first_val(rec, CALL_KEYS, 0)
-            talk_raw  = first_val(rec, TALK_KEYS, 0)
-            try: calls = int(calls_raw)
-            except: calls = 0
-            if isinstance(talk_raw, str):
-                talk_sec = parse_talk_time_str(talk_raw)
+            date = str(row.get("category", "")).strip()
+            if not is_date_string(date):
+                continue
+            try:
+                calls = int(row.get("Total", row.get("calls", 0)))
+            except Exception:
+                calls = 0
+            if calls <= 0:
+                continue
+            t = row.get("Total talk time", row.get("talkTime",
+                row.get("totalTalkTimeSec", 0)))
+            if isinstance(t, str):
+                talk_sec = parse_talk_time_str(t)
             else:
-                try: talk_sec = int(talk_raw)
-                except: talk_sec = 0
-            if calls > 0:
-                reps.append(make_rep(name, calls, talk_sec))
-        if reps:
-            print(f"  ✓ Parsed {len(reps)} rep(s) (flat list format)")
-            return reps
+                try:
+                    talk_sec = int(t)
+                except Exception:
+                    talk_sec = 0
+            if date not in date_map:
+                date_map[date] = {}
+            date_map[date][name] = (calls, talk_sec)
 
-    # ── Strategy 1: response is a dict keyed by rep name ─────────────────────
-    # {"Galen Urbanski": [...], "Jake Dahlquist": [...], ...}
-    if isinstance(data, dict):
-        reps = []
-        for key, val in data.items():
-            if is_date_string(key) or not isinstance(val, list):
-                continue
-            # Each val is a list of date rows for this rep
-            calls = 0
-            talk_sec = 0
-            for row in val:
-                if not isinstance(row, dict):
-                    continue
-                cat = str(row.get("category", "")).strip()
-                # Use today's row, or sum all if today not found
-                if cat == today_str or not is_date_string(cat):
-                    c = row.get("Total", row.get("calls", row.get("totalCalls", 0)))
-                    t = row.get("Total talk time", row.get("talkTime", row.get("totalTalkTimeSec", 0)))
-                    try: calls += int(c)
-                    except: pass
-                    if isinstance(t, str):
-                        talk_sec += parse_talk_time_str(t)
-                    else:
-                        try: talk_sec += int(t)
-                        except: pass
-            if calls > 0:
-                reps.append(make_rep(key, calls, talk_sec))
-        if reps:
-            print(f"  ✓ Parsed {len(reps)} rep(s) (dict-by-rep format)")
-            return reps
+    if not date_map:
+        print("  No date rows with calls > 0 found.")
+        return {}
 
-    # ── Strategy 2: list where each item is a date row with rep name columns ──
-    # [{"category":"2026-03-25","Galen Urbanski":53,"Jake Dahlquist":41,...}, ...]
-    if isinstance(data, list):
-        # Find today's row
-        today_row = None
-        for row in data:
-            if isinstance(row, dict) and row.get("category") == today_str:
-                today_row = row
-                break
-        # Fall back to most recent non-zero row
-        if not today_row:
-            for row in reversed(data):
-                if isinstance(row, dict) and is_date_string(str(row.get("category",""))):
-                    vals = [v for k, v in row.items() if k != "category"
-                            and isinstance(v, (int, float)) and v > 0]
-                    if vals:
-                        today_row = row
-                        break
-
-        if today_row:
-            reps = []
-            for key, val in today_row.items():
-                if key in ("category", "Total", "Total talk time"):
-                    continue
-                if not is_date_string(key) and isinstance(val, (int, float)) and val > 0:
-                    reps.append(make_rep(key, int(val), 0))
-            if reps:
-                print(f"  ✓ Parsed {len(reps)} rep(s) (date-row format, date={today_row.get('category')})")
-                return reps
-
-    # ── Strategy 3: nested series list ───────────────────────────────────────
-    # {"series": [{"name": "Galen", "data": [{"category":"2026-03-25","Total":53},...]},...]}
-    series = None
-    if isinstance(data, dict):
-        for k in ("series", "agents", "users", "reps", "data"):
-            v = data.get(k)
-            if isinstance(v, list):
-                series = v
-                break
-
-    if series:
-        reps = []
-        for s in series:
-            if not isinstance(s, dict):
-                continue
-            name = str(s.get("name", s.get("agentName", ""))).strip()
-            if not name or is_date_string(name):
-                continue
-            rows = s.get("data", s.get("rows", s.get("values", [])))
-            calls = 0; talk_sec = 0
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                cat = str(row.get("category", "")).strip()
-                if cat == today_str:
-                    c = row.get("Total", row.get("calls", 0))
-                    t = row.get("Total talk time", row.get("talkTime", 0))
-                    try: calls += int(c)
-                    except: pass
-                    if isinstance(t, str):
-                        talk_sec += parse_talk_time_str(t)
-                    else:
-                        try: talk_sec += int(t)
-                        except: pass
-            if calls > 0:
-                reps.append(make_rep(name, calls, talk_sec))
-        if reps:
-            print(f"  ✓ Parsed {len(reps)} rep(s) (series format)")
-            return reps
-
-    print("  Could not match any known response format.")
-    return []
+    # Convert to {date: [rep_dicts]}
+    result = {
+        date: [make_rep(n, c, t) for n, (c, t) in reps.items()]
+        for date, reps in date_map.items()
+    }
+    today_str  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_reps = result.get(today_str, [])
+    print(f"  Parsed {len(result)} date(s) with data  (today={today_str}: {len(today_reps)} rep(s))")
+    for r in sorted(today_reps, key=lambda x: x["totalCalls"], reverse=True):
+        print(f"     {r['name']:<25} {r['totalCalls']:>4} calls   {r['totalTalkTimeStr']:>10}")
+    return result
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -479,7 +298,11 @@ def fmt_dur(secs):
 
 # ── Save data ─────────────────────────────────────────────────────────────────
 
-def save(reps, report_id):
+def save(all_dates, report_id):
+    """
+    all_dates: {date_str: [rep_dicts]} — all dates returned by the API.
+    Merges with existing history so no previously-saved days are lost.
+    """
     existing = {}
     if os.path.exists(DATA_FILE):
         try:
@@ -490,10 +313,15 @@ def save(reps, report_id):
 
     today_str  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     report_url = f"https://analytics.nextiva.com/external-reports.html#{report_id}"
-    history    = [s for s in existing.get("history", []) if s.get("date") != today_str]
-    history.append({"date": today_str, "reps": reps})
-    history = sorted(history, key=lambda x: x["date"], reverse=True)[:30]
 
+    # Start from existing history, then overwrite with fresh API data
+    hist_map = {s["date"]: s for s in existing.get("history", [])}
+    for date, reps in all_dates.items():
+        hist_map[date] = {"date": date, "reps": reps}
+
+    history = sorted(hist_map.values(), key=lambda x: x["date"], reverse=True)[:90]
+
+    today_reps   = all_dates.get(today_str, [])
     weekly_snaps = history[:7]
     weekly_reps  = {}
     for snap in weekly_snaps:
@@ -514,7 +342,7 @@ def save(reps, report_id):
     data  = {
         "scrapedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "reportUrl": report_url,
-        "today":  {"reps": reps, "reportDate": today_str},
+        "today":  {"reps": today_reps, "reportDate": today_str},
         "weekly": {
             "reps":      list(weekly_reps.values()),
             "daysCount": len(weekly_snaps),
@@ -526,10 +354,7 @@ def save(reps, report_id):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"  ✓ Saved data.json  ({len(reps)} reps, {len(history)} days)")
-    for r in sorted(reps, key=lambda x: x["totalCalls"], reverse=True):
-        print(f"     {r['name']:<25} {r['totalCalls']:>4} calls   "
-              f"{r['totalTalkTimeStr']:>10}   avg {r['avgTalkTimeSec']}s")
+    print(f"  Saved {len(history)} days of history  (today: {len(today_reps)} reps)")
 
 
 # ── Core scrape pass ──────────────────────────────────────────────────────────
@@ -537,11 +362,11 @@ def save(reps, report_id):
 def run_scrape(svc):
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Starting scrape…")
     report_id = get_report_id_from_gmail(svc)
-    reps      = fetch_nextiva_data(report_id)
-    if reps:
-        save(reps, report_id)
+    all_dates = fetch_nextiva_data(report_id)
+    if all_dates:
+        save(all_dates, report_id)
     else:
-        print("  ✗ No data extracted")
+        print("  No data extracted")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

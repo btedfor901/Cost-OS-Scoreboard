@@ -73,20 +73,10 @@ def display_status():
     return jsonify({"on": _display_on})
 
 
-@app.route("/api/verify-pin", methods=["POST"])
-def verify_pin():
-    body = flask_request.get_json(silent=True) or {}
-    if body.get("pin") != ADMIN_PIN:
-        return jsonify({"ok": False}), 403
-    return jsonify({"ok": True, "displayOn": _display_on})
-
-
 @app.route("/api/toggle", methods=["POST"])
 def toggle_display():
     global _display_on
     body = flask_request.get_json(silent=True) or {}
-    if body.get("pin") != ADMIN_PIN:
-        return jsonify({"error": "forbidden"}), 403
     with _display_lock:
         _display_on = bool(body.get("on", not _display_on))
     log.info("Display toggled → %s", _display_on)
@@ -98,9 +88,6 @@ _scrape_running = False
 @app.route("/api/scrape-now", methods=["POST"])
 def scrape_now():
     global _scrape_running
-    body = flask_request.get_json(silent=True) or {}
-    if body.get("pin") != ADMIN_PIN:
-        return jsonify({"error": "forbidden"}), 403
     if _scrape_running:
         return jsonify({"started": False, "reason": "Scrape already in progress"})
 
@@ -219,68 +206,73 @@ def fetch_nextiva_data(report_id):
         log.info("HTTP %d", r.status_code)
         if r.status_code != 200:
             log.error("Response: %s", r.text[:300])
-            return []
+            return {}
         return parse_response(r.json())
     except Exception as e:
         log.error("API call failed: %s", e)
-        return []
+        return {}
 
 
 def parse_response(data):
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """Returns {date_str: [rep_dicts]} for ALL dates with data."""
+    if not (isinstance(data, dict) and isinstance(data.get("results"), list)):
+        log.warning("Unexpected response format")
+        return {}
 
-    # Nextiva wrapped format: results list + filters.users + meta.tableLabels
-    if isinstance(data, dict) and isinstance(data.get("results"), list):
-        results_list = data["results"]
-        user_emails  = data.get("filters", {}).get("users", [])
-        reps = []
-        for i, series in enumerate(results_list):
-            if not isinstance(series, dict):
+    results_list = data["results"]
+    user_emails  = data.get("filters", {}).get("users", [])
+    date_map     = {}  # {date: {name: (calls, talk_sec)}}
+
+    for i, series in enumerate(results_list):
+        if not isinstance(series, dict):
+            continue
+        meta = series.get("meta", {}) if isinstance(series.get("meta"), dict) else {}
+        tl   = meta.get("tableLabels", [])
+        if isinstance(tl, list) and tl:
+            name = str(tl[0]).strip()
+        else:
+            name = str(series.get("name", series.get("agentName", ""))).strip()
+        if not name and i < len(user_emails):
+            name = user_emails[i].split("@")[0]
+        if not name:
+            name = f"Rep {i+1}"
+
+        for row in series.get("data", series.get("rows", [])):
+            if not isinstance(row, dict):
                 continue
-            meta = series.get("meta", {}) if isinstance(series.get("meta"), dict) else {}
-            table_labels = meta.get("tableLabels", [])
-            if isinstance(table_labels, list) and table_labels:
-                name = str(table_labels[0]).strip()
+            date = str(row.get("category", "")).strip()
+            if not is_date_string(date):
+                continue
+            try:
+                calls = int(row.get("Total", row.get("calls", 0)))
+            except Exception:
+                calls = 0
+            if calls <= 0:
+                continue
+            t = row.get("Total talk time", row.get("talkTime",
+                row.get("totalTalkTimeSec", 0)))
+            if isinstance(t, str):
+                talk_sec = parse_talk_time_str(t)
             else:
-                name = str(series.get("name", series.get("agentName", ""))).strip()
-            if not name and i < len(user_emails):
-                name = user_emails[i].split("@")[0]
-            if not name:
-                name = f"Rep {i+1}"
+                try:
+                    talk_sec = int(t)
+                except Exception:
+                    talk_sec = 0
+            if date not in date_map:
+                date_map[date] = {}
+            date_map[date][name] = (calls, talk_sec)
 
-            rows = series.get("data", series.get("rows", []))
-            today_row = None
-            for row in rows:
-                if isinstance(row, dict) and str(row.get("category","")).strip() == today_str:
-                    today_row = row; break
-            if not today_row:
-                for row in reversed(rows):
-                    if isinstance(row, dict):
-                        try:
-                            if int(row.get("Total", row.get("calls", 0))) > 0:
-                                today_row = row; break
-                        except Exception:
-                            pass
+    if not date_map:
+        log.warning("No date rows with calls > 0 found")
+        return {}
 
-            if today_row:
-                try: calls = int(today_row.get("Total", today_row.get("calls", 0)))
-                except: calls = 0
-                t = today_row.get("Total talk time", today_row.get("talkTime",
-                    today_row.get("totalTalkTimeSec", 0)))
-                if isinstance(t, str):
-                    talk_sec = parse_talk_time_str(t)
-                else:
-                    try: talk_sec = int(t)
-                    except: talk_sec = 0
-                if calls > 0:
-                    reps.append(make_rep(name, calls, talk_sec))
-
-        if reps:
-            log.info("Parsed %d rep(s)", len(reps))
-            return reps
-
-    log.warning("Could not parse Nextiva response")
-    return []
+    result = {
+        date: [make_rep(n, c, t) for n, (c, t) in reps.items()]
+        for date, reps in date_map.items()
+    }
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    log.info("Parsed %d dates (%d reps today)", len(result), len(result.get(today_str, [])))
+    return result
 
 
 def make_rep(name, calls, talk_sec):
@@ -344,9 +336,15 @@ def run_scrape():
         return
 
     report_id = get_report_id_from_gmail(svc)
-    reps = fetch_nextiva_data(report_id)
+    all_dates = fetch_nextiva_data(report_id)
+    if not all_dates:
+        log.warning("No data extracted")
+        return
 
-    # Load + update history
+    today_str  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_reps = all_dates.get(today_str, [])
+
+    # Merge with existing history
     existing = {}
     if os.path.exists(DATA_FILE):
         try:
@@ -355,11 +353,10 @@ def run_scrape():
         except Exception:
             pass
 
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    history   = [s for s in existing.get("history", []) if s.get("date") != today_str]
-    if reps:
-        history.append({"date": today_str, "reps": reps})
-    history = sorted(history, key=lambda x: x["date"], reverse=True)[:30]
+    hist_map = {s["date"]: s for s in existing.get("history", [])}
+    for date, reps in all_dates.items():
+        hist_map[date] = {"date": date, "reps": reps}
+    history = sorted(hist_map.values(), key=lambda x: x["date"], reverse=True)[:90]
 
     weekly_snaps = history[:7]
     weekly_reps  = {}
@@ -373,15 +370,15 @@ def run_scrape():
             weekly_reps[name]["totalTalkTimeSec"] += r["totalTalkTimeSec"]
             weekly_reps[name]["daysActive"]       += 1
     for wr in weekly_reps.values():
-        wr["avgTalkTimeSec"]  = (round(wr["totalTalkTimeSec"] / wr["totalCalls"])
-                                 if wr["totalCalls"] else 0)
+        wr["avgTalkTimeSec"]   = (round(wr["totalTalkTimeSec"] / wr["totalCalls"])
+                                  if wr["totalCalls"] else 0)
         wr["totalTalkTimeStr"] = fmt_dur(wr["totalTalkTimeSec"])
 
     dates = sorted(s["date"] for s in weekly_snaps) if weekly_snaps else []
     data  = {
         "scrapedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "reportUrl": f"https://analytics.nextiva.com/external-reports.html#{report_id}",
-        "today":  {"reps": reps,  "reportDate": today_str},
+        "today":  {"reps": today_reps, "reportDate": today_str},
         "weekly": {"reps": list(weekly_reps.values()),
                    "daysCount": len(weekly_snaps),
                    "dateRange": f"{dates[0]} to {dates[-1]}" if dates else ""},
@@ -389,7 +386,7 @@ def run_scrape():
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
-    log.info("Saved data.json (%d reps today, %d days history)", len(reps), len(history))
+    log.info("Saved %d days of history (%d reps today)", len(history), len(today_reps))
 
 
 # ── Background scheduler ──────────────────────────────────────────────────────
