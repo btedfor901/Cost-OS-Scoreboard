@@ -616,8 +616,8 @@ function renderChart() {
           tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${actMetric === 'talk' ? fmtSec(c.parsed.y * 60) : c.parsed.y + ' calls'}` } }
         },
         scales: {
-          x: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 10 }, maxTicksLimit: 12 } },
-          y: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 11 }, callback: v => v, beginAtZero: true } },
+          x: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 10 }, maxTicksLimit: 12 }, title: { display: true, text: 'Time of Day', color: tickC, font: { size: 11 } } },
+          y: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 11 }, callback: v => v, beginAtZero: true }, title: { display: true, text: 'Total Calls', color: tickC, font: { size: 11 } } },
         },
       },
     });
