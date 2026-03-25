@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="https://scoreboards-production.up.railway.app/costos-logo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cost-OS Scoreboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('costos-theme') || 'dark')</script>
+  <style>
+    /* ── Design tokens (exact match to reference) ── */
+    :root {
+      --color-page:    #0a0e17;
+      --color-card:    #111827;
+      --color-raised:  #1a2235;
+      --color-divider: #243049;
+      --color-brand:   #1271af;
+      --color-heading: #fff;
+      --color-sub:     #94a3b8;
+      --color-dim:     #64748b;
+      --color-emerald: oklch(76.5% .177 163.223);
+      --color-red:     oklch(70.4% .191 22.216);
+    }
+    [data-theme="light"] {
+      --color-page:    #f0f4f8;
+      --color-card:    #fff;
+      --color-raised:  #edf2f7;
+      --color-divider: #d0dae7;
+      --color-heading: #0f1b2d;
+      --color-sub:     #546782;
+      --color-dim:     #8a9ab7;
+    }
+
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border: 0 solid; }
+    html, body {
+      background-color: var(--color-page);
+      min-height: 100vh;
+      color: var(--color-heading);
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+    }
+
+    /* ── Animations ── */
+    @keyframes slideIn  { from { opacity:0; transform:translateX(-20px); } to { opacity:1; transform:translateX(0); } }
+    @keyframes countUp  { from { opacity:0; transform:translateY(10px);  } to { opacity:1; transform:translateY(0);  } }
+    @keyframes barGrow  { from { width: 0%; }                               to { width: var(--bar-w, 100%); } }
+    .animate-slide-in  { animation: .5s ease-out forwards slideIn; }
+    .animate-count-up  { animation: .4s ease-out forwards countUp; }
+    .animate-bar-grow  { animation: .8s ease-out forwards barGrow; }
+
+    /* ── Header ── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background-color: color-mix(in oklab, var(--color-card) 80%, transparent);
+      border-bottom: 1px solid var(--color-divider);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .header-inner {
+      max-width: 80rem;
+      margin-inline: auto;
+      padding: 0 1.5rem;
+      height: 4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      flex-shrink: 0;
+    }
+    .logo img { width: 2.25rem; height: 2.25rem; object-fit: contain; }
+    .logo-text {
+      font-size: 1.125rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--color-heading);
+    }
+    .header-right { display: flex; align-items: center; gap: 0.75rem; }
+    .scraped-time {
+      font-size: 0.75rem;
+      color: var(--color-dim);
+    }
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.25rem; height: 2.25rem;
+      border-radius: 0.5rem;
+      background: var(--color-raised);
+      border: 1px solid var(--color-divider);
+      cursor: pointer;
+      color: var(--color-sub);
+      transition: background .15s;
+    }
+    .theme-toggle:hover { background: var(--color-divider); }
+    .theme-toggle svg { width: 1rem; height: 1rem; }
+
+    /* ── Page body ── */
+    .page {
+      max-width: 80rem;
+      margin-inline: auto;
+      padding: 1.5rem 1.5rem 4rem;
+    }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      display: flex;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--color-divider);
+      margin-bottom: 1.75rem;
+    }
+    .tab-btn {
+      padding: 0.625rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-dim);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color .15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--color-sub); }
+    .tab-btn.active {
+      color: var(--color-heading);
+      border-bottom-color: var(--color-brand);
+    }
+
+    /* ── Sub-header (report date / date range) ── */
+    .sub-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .sub-header-label { font-size: 0.75rem; color: var(--color-dim); }
+    .sub-header-value { font-size: 0.75rem; color: var(--color-sub); }
+
+    /* ── Rep cards grid ── */
+    .rep-grid {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    @media (min-width: 48rem) {
+      .rep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 64rem) {
+      .rep-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    .rep-card {
+      background: var(--color-card);
+      border: 1px solid var(--color-divider);
+      border-radius: 1rem;
+      padding: 1.25rem 1.5rem;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .rep-card:hover { border-color: color-mix(in oklab, var(--color-brand) 40%, transparent); }
+
+    .rep-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .rep-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-heading);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rep-rank-badge {
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      background: var(--color-raised);
+      color: var(--color-dim);
+      margin-left: 0.5rem;
+    }
+    .rep-rank-badge.rank-1 { background: rgba(251,191,36,.15); color: #fbbf24; }
+    .rep-rank-badge.rank-2 { background: rgba(148,163,184,.12); color: #94a3b8; }
+    .rep-rank-badge.rank-3 { background: rgba(180,120,60,.12);  color: #c8844a; }
+
+    /* ── Big call number ── */
+    .calls-number {
+      font-size: 1.875rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+      color: var(--color-heading);
+      margin-bottom: 0.25rem;
+    }
+    .calls-label {
+      font-size: 0.75rem;
+      color: var(--color-dim);
+      margin-bottom: 1rem;
+    }
+
+    /* ── Stat rows ── */
+    .stat-rows { display: flex; flex-direction: column; gap: 0.625rem; }
+    .stat-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .stat-row-label { font-size: 0.75rem; color: var(--color-sub); }
+    .stat-row-value {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-heading);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-row-value.brand { color: var(--color-brand); }
+
+    /* ── Progress bar ── */
+    .bar-track {
+      margin-top: 1rem;
+      height: 0.5rem;
+      background: var(--color-raised);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--color-brand);
+      border-radius: 9999px;
+    }
+
+    /* ── Demos row (below rep grid) ── */
+    .demos-section { margin-bottom: 2rem; }
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-dim);
+      margin-bottom: 0.75rem;
+    }
+    .demos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    .demo-card {
+      background: var(--color-card);
+      border: 1px solid var(--color-divider);
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .demo-name   { font-size: 0.8rem; font-weight: 500; color: var(--color-sub); }
+    .demo-number { font-size: 1.5rem; font-weight: 600; color: var(--color-emerald); font-variant-numeric: tabular-nums; }
+
+    /* ── Empty / loading state ── */
+    .empty {
+      min-height: 16rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      color: var(--color-dim);
+      text-align: center;
+      padding: 2rem;
+    }
+    .empty h2 { font-size: 1rem; font-weight: 500; color: var(--color-sub); }
+    .empty p  { font-size: 0.8rem; line-height: 1.6; max-width: 28rem; }
+    .empty code {
+      background: var(--color-raised);
+      border: 1px solid var(--color-divider);
+      border-radius: 0.375rem;
+      padding: 0.15rem 0.4rem;
+      font-size: 0.78rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* ── Report link ── */
+    .report-link-row { margin-top: 0.5rem; }
+    .report-link {
+      font-size: 0.75rem;
+      color: var(--color-brand);
+      text-decoration: none;
+    }
+    .report-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <img src="https://scoreboards-production.up.railway.app/costos-logo.png" alt="Cost-OS" onerror="this.style.display='none'" />
+      <span class="logo-text">Cost-OS Scoreboard</span>
+    </div>
+    <div class="header-right">
+      <span class="scraped-time" id="scrapedTime"></span>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
+        <svg viewBox="0 0 20 20" fill="currentColor" id="themeIcon">
+          <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4.22 2.22a1 1 0 011.415 1.415l-.707.707a1 1 0 01-1.414-1.414l.706-.708zM18 9a1 1 0 110 2h-1a1 1 0 110-2h1zM14.95 14.95a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707zM11 17a1 1 0 11-2 0v-1a1 1 0 112 0v1zM5.757 14.243a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707zM3 11a1 1 0 110-2h1a1 1 0 110 2H3zM5.05 5.05A1 1 0 016.465 3.636l.707.707A1 1 0 015.757 5.757l-.707-.707zM10 7a3 3 0 100 6 3 3 0 000-6z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Page body -->
+<div class="page">
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="today"  onclick="switchTab('today')">Today</button>
+    <button class="tab-btn"        data-tab="weekly" onclick="switchTab('weekly')">This Week</button>
+  </div>
+
+  <!-- Dynamic content -->
+  <div id="content">
+    <div class="empty">
+      <h2>Loading…</h2>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+let DATA      = null;
+let activeTab = 'today';
+
+// ── Theme ───────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('costos-theme', next);
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (DATA) renderContent(DATA);
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function fmtSec(s) {
+  s = parseInt(s) || 0;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h) return `${h}h ${m}m ${sec}s`;
+  if (m) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function fmtTs(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return 'Updated ' + d.toLocaleDateString('en-US', {month:'short',day:'numeric'})
+       + ' at ' + d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+}
+
+function rankClass(i) { return ['rank-1','rank-2','rank-3'][i] || ''; }
+function rankLabel(i) { return ['#1','#2','#3'][i] || `#${i+1}`; }
+
+// ── Render rep cards ────────────────────────────────────────────────────────
+function repGrid(reps, labelKey) {
+  if (!reps || !reps.length) {
+    return `<div class="empty"><h2>No data</h2><p>Run <code>python main.py</code> to generate data.</p></div>`;
+  }
+  const sorted  = [...reps].sort((a,b) => b.totalCalls - a.totalCalls);
+  const maxCall = sorted[0].totalCalls || 1;
+
+  const cards = sorted.map((r, i) => {
+    const pct      = Math.round((r.totalCalls / maxCall) * 100);
+    const talkStr  = r.totalTalkTimeStr || fmtSec(r.totalTalkTimeSec);
+    const daysInfo = r.daysActive ? `<div class="stat-row"><span class="stat-row-label">Days active</span><span class="stat-row-value">${r.daysActive}</span></div>` : '';
+    return `
+      <div class="rep-card animate-slide-in" style="animation-delay:${i * 0.06}s">
+        <div class="rep-card-top">
+          <span class="rep-name">${r.name}</span>
+          <span class="rep-rank-badge ${rankClass(i)}">${rankLabel(i)}</span>
+        </div>
+        <div class="calls-number animate-count-up" style="animation-delay:${i * 0.06 + 0.1}s">
+          ${r.totalCalls.toLocaleString()}
+        </div>
+        <div class="calls-label">Total Calls</div>
+        <div class="stat-rows">
+          <div class="stat-row">
+            <span class="stat-row-label">Talk time</span>
+            <span class="stat-row-value brand">${talkStr}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-row-label">Avg / call</span>
+            <span class="stat-row-value">${fmtSec(r.avgTalkTimeSec)}</span>
+          </div>
+          ${daysInfo}
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill animate-bar-grow" style="--bar-w:${pct}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `<div class="rep-grid">${cards}</div>`;
+}
+
+// ── Render demos ─────────────────────────────────────────────────────────────
+function demosSection(demos) {
+  if (!demos || !demos.length) return '';
+  const cards = demos.map(d => `
+    <div class="demo-card">
+      <div class="demo-name">${d.name}</div>
+      <div class="demo-number">${d.demos}</div>
+    </div>`).join('');
+  return `
+    <div class="demos-section">
+      <div class="section-title">Demos</div>
+      <div class="demos-grid">${cards}</div>
+    </div>`;
+}
+
+// ── Main render ──────────────────────────────────────────────────────────────
+function renderContent(data) {
+  const el = document.getElementById('content');
+
+  if (!data) {
+    el.innerHTML = `<div class="empty"><h2>No data found</h2>
+      <p>Run <code>python main.py</code> then open this file via a local server:<br>
+      <code>python -m http.server 8000</code></p></div>`;
+    return;
+  }
+
+  if (activeTab === 'today') {
+    const today = data.today || {};
+    const reps  = today.reps || [];
+    el.innerHTML = `
+      <div class="sub-header">
+        <span class="sub-header-label">Date</span>
+        <span class="sub-header-value">${today.reportDate || '—'}</span>
+      </div>
+      ${repGrid(reps)}
+      ${demosSection(data.weekly && data.weekly.demos)}
+      ${data.reportUrl ? `<div class="report-link-row"><a class="report-link" href="${data.reportUrl}" target="_blank" rel="noopener">View source report ↗</a></div>` : ''}`;
+  } else {
+    const weekly = data.weekly || {};
+    const reps   = weekly.reps || [];
+    el.innerHTML = `
+      <div class="sub-header">
+        <span class="sub-header-label">Date range</span>
+        <span class="sub-header-value">${weekly.dateRange || '—'}  (${weekly.daysCount || 0} day${weekly.daysCount !== 1 ? 's' : ''})</span>
+      </div>
+      ${repGrid(reps)}
+      ${demosSection(weekly.demos)}
+      ${data.reportUrl ? `<div class="report-link-row"><a class="report-link" href="${data.reportUrl}" target="_blank" rel="noopener">View source report ↗</a></div>` : ''}`;
+  }
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+fetch('data.json?t=' + Date.now())
+  .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+  .then(data => {
+    DATA = data;
+    if (data.scrapedAt) {
+      document.getElementById('scrapedTime').textContent = fmtTs(data.scrapedAt);
+    }
+    renderContent(data);
+  })
+  .catch(() => {
+    document.getElementById('content').innerHTML = `
+      <div class="empty">
+        <h2>data.json not found</h2>
+        <p>
+          1. Run <code>python main.py</code> to generate data<br>
+          2. Serve this folder: <code>python -m http.server 8000</code><br>
+          3. Open <code>http://localhost:8000</code>
+        </p>
+      </div>`;
+  });
+
+// Auto-refresh every 60 seconds
+setInterval(() => {
+  fetch('data.json?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      DATA = data;
+      if (data.scrapedAt) {
+        document.getElementById('scrapedTime').textContent = fmtTs(data.scrapedAt);
+      }
+      renderContent(data);
+    })
+    .catch(() => {});
+}, 60_000);
+</script>
+</body>
+</html>
