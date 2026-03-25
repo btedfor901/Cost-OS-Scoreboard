@@ -18,8 +18,8 @@
       --heading: #ffffff;
       --sub:     #94a3b8;
       --dim:     #64748b;
-      --brand:   #1271af;
-      --brand-h: #0e5a8a;
+      --brand:   #0c7dc6;
+      --brand-h: #0a69a8;
     }
     [data-theme="light"] {
       --page:    #f0f4f8;
@@ -376,7 +376,7 @@ let dispOn    = true;
 let metric    = 'calls';
 let chartInst = null;
 
-const COLORS = ['#1271af','#0d9488','#7c3aed','#d97706','#dc2626','#059669'];
+const COLORS = ['#0c7dc6','#0891b2','#0d9488','#6366f1','#8b5cf6','#64748b','#0e7490'];
 function avatarColor(n) {
   let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) | 0;
   return COLORS[Math.abs(h) % COLORS.length];
