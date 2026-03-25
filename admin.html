@@ -207,9 +207,18 @@
     .chart-empty { text-align: center; color: var(--dim); padding: 3rem 1rem; }
     .chart-empty .big { font-size: 2.5rem; opacity: .3; margin-bottom: 0.5rem; }
 
-    /* ── Rep analytics ── */
+    /* ── Activity Chart enhanced ── */
+    .act-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .date-sel {
+      padding: 0.3rem 0.625rem; border-radius: 0.375rem; font-size: 0.8rem;
+      border: 1px solid var(--divider); background: var(--raised); color: var(--heading);
+      font-family: inherit; cursor: pointer;
+    }
+
+    /* ── Rep analytics enhanced ── */
+    .analytics-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
     .analytics-rep {
-      background: var(--raised); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 0.75rem;
+      background: var(--raised); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 0.875rem;
     }
     .analytics-rep-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
     .rep-avatar {
@@ -218,12 +227,25 @@
       font-size: 0.75rem; font-weight: 700; color: #fff; flex-shrink: 0;
     }
     .rep-full-name { font-size: 0.9rem; font-weight: 700; }
-    .rep-meta { font-size: 0.75rem; color: var(--sub); }
-    .rep-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
-    @media (max-width: 600px) { .rep-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .rep-meta { font-size: 0.72rem; color: var(--sub); }
+    .rep-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.625rem; margin-bottom: 1rem; }
+    @media (max-width: 680px) { .rep-stats-grid { grid-template-columns: repeat(3, 1fr); } }
     .rep-stat { background: var(--card); border-radius: 0.5rem; padding: 0.75rem; }
-    .rep-stat .sl { font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 0.25rem; }
-    .rep-stat .sv { font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rep-stat .sl { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 0.25rem; }
+    .rep-stat .sv { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+    .rep-stat .ss { font-size: 0.68rem; color: var(--sub); margin-top: 0.15rem; }
+    .trend-up   { color: #10b981; font-size: 0.7rem; font-weight: 600; }
+    .trend-down { color: #ef4444; font-size: 0.7rem; font-weight: 600; }
+    .rep-bottom { display: flex; align-items: flex-end; gap: 1rem; }
+    .rep-sparkline { flex: 1; height: 60px; }
+    .day-boxes { display: flex; gap: 0.375rem; flex-shrink: 0; }
+    .day-box {
+      display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+      background: var(--card); border-radius: 0.375rem; padding: 0.375rem 0.5rem; min-width: 2.5rem;
+    }
+    .day-box .db-label { font-size: 0.58rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .day-box .db-val   { font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .day-box-header { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; font-weight: 600; }
 
     /* ── Toast ── */
     .toast {
@@ -338,10 +360,16 @@
     <!-- Activity Chart -->
     <div class="card">
       <div class="card-title"><span class="icon">📈</span> Activity</div>
-      <div class="chart-controls">
-        <div class="tab-row">
-          <button class="tab-btn active" id="tabCalls" onclick="setMetric('calls')">Calls</button>
-          <button class="tab-btn" id="tabTalk" onclick="setMetric('talk')">Talk Time</button>
+      <div class="act-controls">
+        <div class="tab-row" id="actViewTabs">
+          <button class="tab-btn active" data-view="intraday" onclick="setActView('intraday')">Intraday</button>
+          <button class="tab-btn" data-view="weekly" onclick="setActView('weekly')">Weekly</button>
+          <button class="tab-btn" data-view="monthly" onclick="setActView('monthly')">Monthly</button>
+        </div>
+        <select class="date-sel" id="intradayDateSel" onchange="setIntradayDate(this.value)" style="display:none"></select>
+        <div class="tab-row" id="actMetricTabs">
+          <button class="tab-btn active" data-m="calls" onclick="setActMetric('calls')">Calls</button>
+          <button class="tab-btn" data-m="talk" onclick="setActMetric('talk')">Talk Time</button>
         </div>
         <span class="live-dot"></span>
         <span class="live-label">LIVE</span>
@@ -350,8 +378,7 @@
         <canvas id="actChart"></canvas>
         <div id="chartEmpty" class="chart-empty" style="display:none">
           <div class="big">📊</div>
-          <div>No history data yet</div>
-          <div style="font-size:.75rem;margin-top:.375rem;color:var(--dim)">Data accumulates over daily scrapes.</div>
+          <div>No data yet</div>
         </div>
       </div>
       <div id="chartLegend" class="chart-legend"></div>
@@ -360,7 +387,19 @@
     <!-- Rep Analytics -->
     <div class="card">
       <div class="card-title"><span class="icon">📊</span> Rep Analytics</div>
-      <p class="desc">Performance insights based on all available history.</p>
+      <p class="desc">Performance insights per rep — averages, trends, and patterns based on historical data.</p>
+      <div class="analytics-controls">
+        <div class="tab-row" id="aRangeTabs">
+          <button class="tab-btn active" data-r="7"   onclick="setARange('7')">Last 7 Days</button>
+          <button class="tab-btn"         data-r="14"  onclick="setARange('14')">Last 14 Days</button>
+          <button class="tab-btn"         data-r="30"  onclick="setARange('30')">Last 30 Days</button>
+          <button class="tab-btn"         data-r="all" onclick="setARange('all')">All Time</button>
+        </div>
+        <div class="tab-row" id="aMetricTabs">
+          <button class="tab-btn active" data-am="calls" onclick="setAMetric('calls')">Calls</button>
+          <button class="tab-btn"        data-am="talk"  onclick="setAMetric('talk')">Talk Time</button>
+        </div>
+      </div>
       <div id="repAnalytics"></div>
     </div>
 
@@ -373,14 +412,8 @@
 // ── State ─────────────────────────────────────────────────────────────────────
 let DATA      = null;
 let dispOn    = true;
-let metric    = 'calls';
 let chartInst = null;
 
-const COLORS = ['#0c7dc6','#0891b2','#0d9488','#6366f1','#8b5cf6','#64748b','#0e7490'];
-function avatarColor(n) {
-  let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) | 0;
-  return COLORS[Math.abs(h) % COLORS.length];
-}
 function initials(n) { return n.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -390,8 +423,7 @@ function toggleTheme() {
   localStorage.setItem('costos-theme', t);
   document.getElementById('sunIcon').style.display  = t === 'dark' ? '' : 'none';
   document.getElementById('moonIcon').style.display = t === 'light' ? '' : 'none';
-  if (chartInst) { chartInst.destroy(); chartInst = null; }
-  if (DATA) renderChart();
+  rebuildChart();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -410,7 +442,7 @@ async function loadData() {
     if (!r.ok) return;
     DATA = await r.json();
     updateStatus();
-    renderChart();
+    rebuildChart();
     renderAnalytics();
   } catch(_) {}
 
@@ -503,110 +535,307 @@ function copyLink(id) {
 }
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
-function setMetric(m) {
-  metric = m;
-  document.getElementById('tabCalls').classList.toggle('active', m === 'calls');
-  document.getElementById('tabTalk').classList.toggle('active', m === 'talk');
+let actView    = 'intraday';
+let actMetric  = 'calls';
+let intradayDate = null;
+
+const CHART_COLORS = ['#0c7dc6', '#06b6d4', '#3b82f6'];
+function repColor(name, allNames) {
+  const i = allNames.indexOf(name);
+  return CHART_COLORS[i % CHART_COLORS.length];
+}
+
+function setActView(v) {
+  actView = v;
+  document.querySelectorAll('#actViewTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  const sel = document.getElementById('intradayDateSel');
+  sel.style.display = v === 'intraday' ? '' : 'none';
+  rebuildChart();
+}
+function setActMetric(m) {
+  actMetric = m;
+  document.querySelectorAll('#actMetricTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.m === m));
+  rebuildChart();
+}
+function setIntradayDate(d) { intradayDate = d; rebuildChart(); }
+
+function rebuildChart() {
   if (chartInst) { chartInst.destroy(); chartInst = null; }
   renderChart();
 }
 
 function renderChart() {
-  const history = DATA?.history;
-  const empty   = document.getElementById('chartEmpty');
-  if (!history || history.length === 0) {
-    empty.style.display = '';
+  const empty  = document.getElementById('chartEmpty');
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const gridC  = isDark ? '#243049' : '#d0dae7';
+  const tickC  = isDark ? '#64748b' : '#8a9ab7';
+
+  if (actView === 'intraday') {
+    // Use intraday time-series from data.json
+    const intra = DATA?.intraday;
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Populate date selector from history
+    const dateSel = document.getElementById('intradayDateSel');
+    const histDates = (DATA?.history || []).map(s => s.date).sort().reverse().slice(0, 7);
+    dateSel.innerHTML = histDates.map(d => {
+      const label = d === today ? `${d} (Today)` : d;
+      return `<option value="${d}" ${(intradayDate || today) === d ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+    if (!intradayDate) intradayDate = today;
+
+    if (!intra || intra.date !== intradayDate || !intra.points?.length) {
+      empty.style.display = ''; document.getElementById('chartLegend').innerHTML = ''; return;
+    }
+    empty.style.display = 'none';
+
+    const points   = intra.points;
+    const labels   = points.map(p => p.time);
+    const repNames = [...new Set(points.flatMap(p => Object.keys(p.reps)))];
+
+    const datasets = repNames.map(name => ({
+      label: name,
+      data: points.map(p => p.reps[name] ?? null),
+      borderColor: repColor(name, repNames),
+      backgroundColor: repColor(name, repNames),
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.3,
+      fill: false,
+      spanGaps: true,
+    }));
+
+    const ctx = document.getElementById('actChart').getContext('2d');
+    chartInst = new Chart(ctx, {
+      type: 'line', data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${actMetric === 'talk' ? fmtSec(c.parsed.y * 60) : c.parsed.y + ' calls'}` } }
+        },
+        scales: {
+          x: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 10 }, maxTicksLimit: 12 } },
+          y: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 11 }, callback: v => v, beginAtZero: true } },
+        },
+      },
+    });
+    buildLegend(repNames);
     return;
   }
+
+  // Weekly / Monthly from history
+  const history = DATA?.history;
+  if (!history?.length) { empty.style.display = ''; document.getElementById('chartLegend').innerHTML = ''; return; }
   empty.style.display = 'none';
 
-  const days    = [...history].sort((a,b) => a.date.localeCompare(b.date)).slice(-14);
-  const labels  = days.map(d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric'}));
+  const dayCount = actView === 'weekly' ? 7 : 30;
+  const days     = [...history].sort((a,b) => a.date.localeCompare(b.date)).slice(-dayCount);
+  const labels   = days.map(d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'}));
   const repNames = [...new Set(days.flatMap(d => d.reps.map(r => r.name)))];
-  const isDark   = document.documentElement.getAttribute('data-theme') !== 'light';
 
-  const datasets = repNames.map((name, i) => ({
+  const datasets = repNames.map(name => ({
     label: name,
     data: days.map(d => {
-      const rep = d.reps.find(r => r.name === name);
-      if (!rep) return 0;
-      return metric === 'calls' ? rep.totalCalls : Math.round(rep.totalTalkTimeSec / 60);
+      const r = d.reps.find(r => r.name === name);
+      if (!r) return null;
+      return actMetric === 'calls' ? r.totalCalls : Math.round(r.totalTalkTimeSec / 60);
     }),
-    backgroundColor: avatarColor(name),
-    borderRadius: 4,
-    borderSkipped: false,
+    borderColor: repColor(name, repNames),
+    backgroundColor: repColor(name, repNames),
+    borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, tension: 0.3, fill: false, spanGaps: true,
   }));
 
   const ctx = document.getElementById('actChart').getContext('2d');
   chartInst = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets },
+    type: 'line', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: {
-        callbacks: {
-          label: ctx => {
-            const val = ctx.parsed.y;
-            if (metric === 'talk') return ` ${ctx.dataset.label}: ${fmtSec(val * 60)}`;
-            return ` ${ctx.dataset.label}: ${val} calls`;
-          }
-        }
-      }},
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${actMetric === 'talk' ? fmtSec(c.parsed.y * 60) : c.parsed.y + ' calls'}` } }
+      },
       scales: {
-        x: { grid: { color: isDark ? '#243049' : '#d0dae7' }, ticks: { color: isDark ? '#64748b' : '#8a9ab7', font: { size: 11 } } },
-        y: { grid: { color: isDark ? '#243049' : '#d0dae7' }, ticks: {
-          color: isDark ? '#64748b' : '#8a9ab7', font: { size: 11 },
-          callback: v => metric === 'talk' ? fmtSec(v * 60) : v
-        }, beginAtZero: true },
+        x: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 11 } } },
+        y: { grid: { color: gridC }, ticks: { color: tickC, font: { size: 11 }, callback: v => actMetric === 'talk' ? fmtSec(v * 60) : v, beginAtZero: true } },
       },
     },
   });
+  buildLegend(repNames);
+}
 
-  // Legend
-  const legendEl = document.getElementById('chartLegend');
-  legendEl.innerHTML = repNames.map(n => `
+function buildLegend(repNames) {
+  document.getElementById('chartLegend').innerHTML = repNames.map(n => `
     <div class="leg-item">
-      <div class="leg-dot" style="background:${avatarColor(n)}"></div>
-      ${n}
+      <div class="leg-dot" style="background:${repColor(n, repNames)}"></div>${n}
     </div>`).join('');
 }
 
 // ── Rep Analytics ─────────────────────────────────────────────────────────────
+let aRange  = '7';
+let aMetric = 'calls';
+let sparkCharts = {};
+
+function setARange(r) {
+  aRange = r;
+  document.querySelectorAll('#aRangeTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.r === r));
+  renderAnalytics();
+}
+function setAMetric(m) {
+  aMetric = m;
+  document.querySelectorAll('#aMetricTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.am === m));
+  renderAnalytics();
+}
+
 function renderAnalytics() {
   const el = document.getElementById('repAnalytics');
   if (!DATA?.history?.length) { el.innerHTML = `<div style="text-align:center;color:var(--dim);padding:2rem">No history data yet.</div>`; return; }
 
+  // Filter history by range
+  const sorted = [...DATA.history].sort((a,b) => a.date.localeCompare(b.date));
+  const filtered = aRange === 'all' ? sorted : sorted.slice(-parseInt(aRange));
+  if (!filtered.length) { el.innerHTML = `<div style="text-align:center;color:var(--dim);padding:2rem">No data for this range.</div>`; return; }
+
+  // Collect per-rep data
   const repMap = {};
-  for (const snap of DATA.history) {
+  for (const snap of filtered) {
     for (const r of snap.reps) {
       if (!repMap[r.name]) repMap[r.name] = { name: r.name, days: [] };
       repMap[r.name].days.push({ date: snap.date, calls: r.totalCalls, talkSec: r.totalTalkTimeSec });
     }
   }
 
-  el.innerHTML = Object.values(repMap).map(rep => {
+  const allRepNames = Object.keys(repMap).sort();
+
+  // Destroy old sparkline charts
+  Object.values(sparkCharts).forEach(c => c.destroy());
+  sparkCharts = {};
+
+  el.innerHTML = allRepNames.map(name => {
+    const rep        = repMap[name];
+    const color      = repColor(name, allRepNames);
+    const n          = rep.days.length;
     const totalCalls = rep.days.reduce((a, d) => a + d.calls, 0);
     const totalTalk  = rep.days.reduce((a, d) => a + d.talkSec, 0);
-    const avgCalls   = Math.round(totalCalls / rep.days.length);
-    const avgTalkSec = totalCalls ? Math.round(totalTalk / totalCalls) : 0;
-    const color      = avatarColor(rep.name);
-    return `
-      <div class="analytics-rep">
-        <div class="analytics-rep-header">
-          <div class="rep-avatar" style="background:${color}">${initials(rep.name)}</div>
-          <div>
-            <div class="rep-full-name">${rep.name}</div>
-            <div class="rep-meta">${rep.days.length} active day${rep.days.length !== 1 ? 's' : ''} tracked</div>
-          </div>
-        </div>
-        <div class="rep-stats-grid">
-          <div class="rep-stat"><div class="sl">Total Calls</div><div class="sv">${totalCalls.toLocaleString()}</div></div>
-          <div class="rep-stat"><div class="sl">Avg Calls/Day</div><div class="sv">${avgCalls}</div></div>
-          <div class="rep-stat"><div class="sl">Total Talk</div><div class="sv">${fmtSec(totalTalk)}</div></div>
-          <div class="rep-stat"><div class="sl">Avg / Call</div><div class="sv">${fmtSec(avgTalkSec)}</div></div>
-        </div>
+    const avgCalls   = (totalCalls / n).toFixed(1);
+    const avgTalkDay = fmtSec(Math.round(totalTalk / n));
+    const avgTalkCall= totalCalls ? fmtSec(Math.round(totalTalk / totalCalls)) : '—';
+
+    const sorted2   = [...rep.days].sort((a,b) => a.date.localeCompare(b.date));
+    const bestDay   = sorted2.reduce((best, d) => d.calls > best.calls ? d : best, sorted2[0]);
+    const lowestDay = sorted2.reduce((low,  d) => d.calls < low.calls  ? d : low,  sorted2[0]);
+
+    function fmtDate(ds) {
+      return new Date(ds + 'T12:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+    }
+
+    // Trend: compare second half to first half avg
+    const half  = Math.floor(n / 2);
+    let trendHtml = '';
+    if (half > 0) {
+      const first  = sorted2.slice(0, half).reduce((a,d) => a + d.calls, 0) / half;
+      const second = sorted2.slice(half).reduce((a,d) => a + d.calls, 0) / (n - half);
+      const pct    = first > 0 ? Math.round(((second - first) / first) * 100) : 0;
+      if (pct !== 0) {
+        const cls = pct > 0 ? 'trend-up' : 'trend-down';
+        const sign = pct > 0 ? '▲' : '▼';
+        trendHtml = `<span class="${cls}">${sign}${Math.abs(pct)}%</span>`;
+      }
+    }
+
+    // Last 5 days boxes
+    const last5 = sorted2.slice(-5);
+    const dayAbbr = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    const dayBoxes = last5.map(d => {
+      const dow = dayAbbr[new Date(d.date + 'T12:00:00').getDay()];
+      const val = aMetric === 'calls' ? d.calls : fmtSec(d.talkSec);
+      return `<div class="day-box" style="border-top:2px solid ${color}">
+        <div class="db-label">${dow}</div>
+        <div class="db-val" style="color:${color}">${val}</div>
       </div>`;
+    }).join('');
+
+    const sparkId = `spark_${name.replace(/\s+/g,'_')}`;
+
+    return `<div class="analytics-rep">
+      <div class="analytics-rep-header">
+        <div class="rep-avatar" style="background:${color}">${initials(name)}</div>
+        <div>
+          <div class="rep-full-name">${name}</div>
+          <div class="rep-meta">${n} day${n !== 1 ? 's' : ''} of data</div>
+        </div>
+      </div>
+      <div class="rep-stats-grid">
+        <div class="rep-stat">
+          <div class="sl">Avg Calls / Day</div>
+          <div class="sv">${avgCalls} ${trendHtml}</div>
+          <div class="ss">per working day</div>
+        </div>
+        <div class="rep-stat">
+          <div class="sl">Avg Talk / Day</div>
+          <div class="sv">${avgTalkDay}</div>
+          <div class="ss">per working day</div>
+        </div>
+        <div class="rep-stat">
+          <div class="sl">Avg Talk / Call</div>
+          <div class="sv">${avgTalkCall}</div>
+          <div class="ss">${totalCalls} total calls</div>
+        </div>
+        <div class="rep-stat">
+          <div class="sl">Best Day</div>
+          <div class="sv">${bestDay.calls}</div>
+          <div class="ss">${fmtDate(bestDay.date)}</div>
+        </div>
+        <div class="rep-stat">
+          <div class="sl">Lowest Day</div>
+          <div class="sv">${lowestDay.calls}</div>
+          <div class="ss">${fmtDate(lowestDay.date)}</div>
+        </div>
+      </div>
+      <div class="rep-bottom">
+        <div class="rep-sparkline"><canvas id="${sparkId}"></canvas></div>
+        <div>
+          <div class="day-box-header">AVG ${aMetric === 'calls' ? 'CALLS' : 'TALK'} BY DAY</div>
+          <div class="day-boxes">${dayBoxes}</div>
+        </div>
+      </div>
+    </div>`;
   }).join('');
+
+  // Draw sparkline charts after DOM update
+  requestAnimationFrame(() => {
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    allRepNames.forEach(name => {
+      const rep   = repMap[name];
+      const color = repColor(name, allRepNames);
+      const sparkId = `spark_${name.replace(/\s+/g,'_')}`;
+      const canvas  = document.getElementById(sparkId);
+      if (!canvas) return;
+      const sorted2 = [...rep.days].sort((a,b) => a.date.localeCompare(b.date));
+      const vals = sorted2.map(d => aMetric === 'calls' ? d.calls : Math.round(d.talkSec / 60));
+      const labels = sorted2.map(d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric'}));
+      sparkCharts[name] = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: vals, borderColor: color, backgroundColor: color + '22',
+            borderWidth: 2, pointRadius: 2, tension: 0.4, fill: true,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: {
+            x: { display: false },
+            y: { display: false, beginAtZero: true },
+          },
+          animation: false,
+        },
+      });
+    });
+  });
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────

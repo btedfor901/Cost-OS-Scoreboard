@@ -401,6 +401,20 @@ def run_scrape():
         except Exception:
             pass
 
+    # Build intraday time-series for today
+    existing_intraday = existing.get("intraday", {}) if os.path.exists(DATA_FILE) else {}
+    if existing_intraday.get("date") == today_str:
+        intraday_points = existing_intraday.get("points", [])
+    else:
+        intraday_points = []
+    current_time = datetime.now(timezone.utc).strftime("%H:%M")
+    if not intraday_points or intraday_points[-1]["time"] != current_time:
+        intraday_points.append({
+            "time": current_time,
+            "reps": {r["name"]: r["totalCalls"] for r in today_reps},
+        })
+    intraday_data = {"date": today_str, "points": intraday_points}
+
     hist_map = {s["date"]: s for s in existing.get("history", [])}
     for date, reps in all_dates.items():
         hist_map[date] = {"date": date, "reps": reps}
@@ -436,6 +450,7 @@ def run_scrape():
                    "dateRange": f"{dates[0]} to {dates[-1]}" if dates else ""},
         "history": history,
         "demos":   {"total": demos_total, "reps": demos_reps},
+        "intraday": intraday_data,
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
