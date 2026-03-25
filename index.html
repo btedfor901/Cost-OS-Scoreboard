@@ -550,7 +550,7 @@ function render() {
 
     <div class="avg-card-outer">
       <div class="avg-header">
-        <span class="avg-title">Average Talk Time</span>
+        <span class="avg-title">${avgMode === 'talk' ? 'Average Talk Time' : 'Average Calls Per Day'}</span>
         <div class="avg-toggle">
           <button class="avg-toggle-btn ${avgMode === 'talk' ? 'active' : ''}" onclick="setAvg('talk')">Talk Time</button>
           <button class="avg-toggle-btn ${avgMode === 'calls' ? 'active' : ''}" onclick="setAvg('calls')">Avg Calls</button>
