@@ -163,16 +163,21 @@
     .lb-title  { font-size: 0.875rem; font-weight: 600; }
     .lb-badge  { font-size: 0.7rem; color: var(--dim); background: var(--raised); padding: 0.15rem 0.5rem; border-radius: 9999px; }
 
-    .rep-row { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 0; }
+    .rep-row { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 0; border-radius: 0.5rem; }
     .rep-row + .rep-row { border-top: 1px solid var(--border); }
+    .rep-row.gold   { background: rgba(251,191,36,.06);  margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-top: none !important; border-bottom: 1px solid rgba(251,191,36,.15); margin-bottom: 2px; }
+    .rep-row.silver { background: rgba(148,163,184,.04); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
+    .rep-row.bronze { background: rgba(180,120,60,.04);  margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
 
     .rank-dot {
-      width: 1.375rem; height: 1.375rem; border-radius: 50%; flex-shrink: 0;
+      width: 1.5rem; height: 1.5rem; border-radius: 50%; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.65rem; font-weight: 700;
+      font-size: 0.68rem; font-weight: 800;
       background: var(--raised); color: var(--dim);
     }
-    .rank-dot.r1 { background: var(--brand); color: #fff; }
+    .rank-dot.r1 { background: #f59e0b; color: #fff; box-shadow: 0 0 8px rgba(245,158,11,.4); }
+    .rank-dot.r2 { background: #94a3b8; color: #fff; }
+    .rank-dot.r3 { background: #c8844a; color: #fff; }
 
     .avatar {
       width: 2rem; height: 2rem; border-radius: 50%; flex-shrink: 0;
@@ -405,11 +410,15 @@ function render() {
   const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
 
   function repRow(r, rank, value, maxVal, isTime) {
-    const pct   = Math.round((value / maxVal) * 100);
-    const color = avatarColor(r.name);
-    const disp  = isTime ? fmtSec(value) : value.toLocaleString();
-    return `<div class="rep-row">
-      <div class="rank-dot ${rank === 1 ? 'r1' : ''}">${rank}</div>
+    const pct      = Math.round((value / maxVal) * 100);
+    const color    = avatarColor(r.name);
+    const disp     = isTime ? fmtSec(value) : value.toLocaleString();
+    const rankCls  = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
+    const rowCls   = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const valColor = rank === 1 ? '#f59e0b' : rank === 2 ? '#94a3b8' : rank === 3 ? '#c8844a' : '';
+    const valStyle = valColor ? `style="color:${valColor}"` : '';
+    return `<div class="rep-row ${rowCls}">
+      <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
       <div class="rep-mid">
         <div class="rep-name">${r.name}</div>
@@ -417,7 +426,7 @@ function render() {
           <div class="rep-bar-fill" style="width:${pct}%;background:${color}"></div>
         </div>
       </div>
-      <div class="rep-val${isTime ? ' accent' : ''}">${disp}</div>
+      <div class="rep-val${isTime ? ' accent' : ''}" ${valStyle}>${disp}</div>
     </div>`;
   }
 
