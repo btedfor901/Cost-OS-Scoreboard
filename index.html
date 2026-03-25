@@ -393,8 +393,9 @@ function render() {
   const [start, end] = getRange(activeTab);
   let reps = aggregate(DATA.history, start, end);
 
-  // Fallback: today tab uses data.today if history is empty for today
-  if (activeTab === 'today' && reps.length === 0 && DATA.today && DATA.today.reps) {
+  // Fallback: today tab uses data.today only if reportDate matches today (resets at midnight)
+  if (activeTab === 'today' && reps.length === 0 && DATA.today && DATA.today.reps
+      && DATA.today.reportDate === toYMD(new Date())) {
     reps = DATA.today.reps.map(r => ({...r, daysActive: 1}));
   }
 
