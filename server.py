@@ -20,7 +20,7 @@ import logging
 from datetime import datetime, timezone
 
 import requests
-from flask import Flask, send_file, jsonify, abort
+from flask import Flask, send_file, jsonify, abort, request as flask_request
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -30,10 +30,16 @@ log = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-SCOPES   = ["https://www.googleapis.com/auth/gmail.readonly"]
-DIR      = os.path.dirname(os.path.abspath(__file__))
+SCOPES    = ["https://www.googleapis.com/auth/gmail.readonly"]
+DIR       = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(DIR, "data.json")
 INTERVAL  = int(os.environ.get("INTERVAL_MINUTES", "15")) * 60  # seconds
+ADMIN_PIN = os.environ.get("ADMIN_PIN", "costos2026")
+
+# ── Display toggle state ──────────────────────────────────────────────────────
+
+_display_on   = True
+_display_lock = threading.Lock()
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +61,31 @@ def data():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/display-status")
+def display_status():
+    return jsonify({"on": _display_on})
+
+
+@app.route("/api/verify-pin", methods=["POST"])
+def verify_pin():
+    body = flask_request.get_json(silent=True) or {}
+    if body.get("pin") != ADMIN_PIN:
+        return jsonify({"ok": False}), 403
+    return jsonify({"ok": True, "displayOn": _display_on})
+
+
+@app.route("/api/toggle", methods=["POST"])
+def toggle_display():
+    global _display_on
+    body = flask_request.get_json(silent=True) or {}
+    if body.get("pin") != ADMIN_PIN:
+        return jsonify({"error": "forbidden"}), 403
+    with _display_lock:
+        _display_on = bool(body.get("on", not _display_on))
+    log.info("Display toggled → %s", _display_on)
+    return jsonify({"on": _display_on})
 
 
 # ── Gmail Auth (env-var first, fallback to files) ─────────────────────────────

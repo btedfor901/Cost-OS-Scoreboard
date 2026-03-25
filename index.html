@@ -2,368 +2,307 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" href="https://scoreboards-production.up.railway.app/costos-logo.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cost-OS Scoreboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('costos-theme') || 'dark')</script>
   <style>
-    /* ── Design tokens (exact match to reference) ── */
     :root {
-      --color-page:    #0a0e17;
-      --color-card:    #111827;
-      --color-raised:  #1a2235;
-      --color-divider: #243049;
-      --color-brand:   #1271af;
-      --color-heading: #fff;
-      --color-sub:     #94a3b8;
-      --color-dim:     #64748b;
-      --color-emerald: oklch(76.5% .177 163.223);
-      --color-red:     oklch(70.4% .191 22.216);
+      --bg:     #0a0e17;
+      --card:   #111827;
+      --raised: #1a2235;
+      --border: #243049;
+      --brand:  #1271af;
+      --text:   #fff;
+      --sub:    #94a3b8;
+      --dim:    #64748b;
     }
     [data-theme="light"] {
-      --color-page:    #f0f4f8;
-      --color-card:    #fff;
-      --color-raised:  #edf2f7;
-      --color-divider: #d0dae7;
-      --color-heading: #0f1b2d;
-      --color-sub:     #546782;
-      --color-dim:     #8a9ab7;
+      --bg:     #f0f4f8;
+      --card:   #ffffff;
+      --raised: #edf2f7;
+      --border: #d0dae7;
+      --text:   #0f1b2d;
+      --sub:    #546782;
+      --dim:    #8a9ab7;
     }
 
-    /* ── Base ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border: 0 solid; }
-    html, body {
-      background-color: var(--color-page);
-      min-height: 100vh;
-      color: var(--color-heading);
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-    }
-
-    /* ── Animations ── */
-    @keyframes slideIn  { from { opacity:0; transform:translateX(-20px); } to { opacity:1; transform:translateX(0); } }
-    @keyframes countUp  { from { opacity:0; transform:translateY(10px);  } to { opacity:1; transform:translateY(0);  } }
-    @keyframes barGrow  { from { width: 0%; }                               to { width: var(--bar-w, 100%); } }
-    .animate-slide-in  { animation: .5s ease-out forwards slideIn; }
-    .animate-count-up  { animation: .4s ease-out forwards countUp; }
-    .animate-bar-grow  { animation: .8s ease-out forwards barGrow; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
     /* ── Header ── */
     .header {
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      background-color: color-mix(in oklab, var(--color-card) 80%, transparent);
-      border-bottom: 1px solid var(--color-divider);
+      position: sticky; top: 0; z-index: 100;
+      background: color-mix(in oklab, var(--card) 88%, transparent);
       backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
     }
     .header-inner {
-      max-width: 80rem;
-      margin-inline: auto;
-      padding: 0 1.5rem;
-      height: 4rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
+      max-width: 90rem; margin: 0 auto; padding: 0 1.25rem;
+      height: 3.75rem;
+      display: flex; align-items: center; gap: 1rem;
     }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.625rem;
-      flex-shrink: 0;
+    .logo { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+    .logo-icon {
+      width: 2rem; height: 2rem; border-radius: 0.375rem;
+      background: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.875rem; font-weight: 700; color: #fff;
     }
-    .logo img { width: 2.25rem; height: 2.25rem; object-fit: contain; }
-    .logo-text {
-      font-size: 1.125rem;
-      font-weight: 600;
-      letter-spacing: -0.025em;
-      color: var(--color-heading);
-    }
-    .header-right { display: flex; align-items: center; gap: 0.75rem; }
-    .scraped-time {
-      font-size: 0.75rem;
-      color: var(--color-dim);
-    }
-    .theme-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 2.25rem; height: 2.25rem;
-      border-radius: 0.5rem;
-      background: var(--color-raised);
-      border: 1px solid var(--color-divider);
-      cursor: pointer;
-      color: var(--color-sub);
-      transition: background .15s;
-    }
-    .theme-toggle:hover { background: var(--color-divider); }
-    .theme-toggle svg { width: 1rem; height: 1rem; }
+    .logo-label { font-size: 0.875rem; line-height: 1.2; }
+    .logo-label strong { color: var(--brand); font-weight: 700; }
+    .logo-label small  { display: block; font-size: 0.7rem; color: var(--sub); font-weight: 500; }
 
-    /* ── Page body ── */
-    .page {
-      max-width: 80rem;
-      margin-inline: auto;
-      padding: 1.5rem 1.5rem 4rem;
-    }
+    .header-meta { font-size: 0.75rem; color: var(--sub); flex-shrink: 0; white-space: nowrap; }
+    .header-meta .updated { color: var(--brand); }
 
-    /* ── Tab bar ── */
-    .tab-bar {
-      display: flex;
-      gap: 0.25rem;
-      border-bottom: 1px solid var(--color-divider);
-      margin-bottom: 1.75rem;
+    .tab-nav {
+      display: flex; align-items: center; gap: 0.125rem;
+      flex: 1; justify-content: center;
+      overflow-x: auto; scrollbar-width: none;
     }
+    .tab-nav::-webkit-scrollbar { display: none; }
     .tab-btn {
-      padding: 0.625rem 1rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--color-dim);
-      background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
-      cursor: pointer;
-      font-family: inherit;
-      transition: color .15s;
-      white-space: nowrap;
+      padding: 0.375rem 0.75rem; border-radius: 0.5rem;
+      font-size: 0.8rem; font-weight: 500;
+      border: none; background: transparent; color: var(--sub);
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+      transition: all .15s;
     }
-    .tab-btn:hover { color: var(--color-sub); }
-    .tab-btn.active {
-      color: var(--color-heading);
-      border-bottom-color: var(--color-brand);
-    }
+    .tab-btn:hover { background: var(--raised); color: var(--text); }
+    .tab-btn.active { background: var(--brand); color: #fff; }
 
-    /* ── Sub-header (report date / date range) ── */
-    .sub-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.25rem;
+    .header-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+    .admin-btn {
+      padding: 0.35rem 0.875rem; border-radius: 0.5rem;
+      font-size: 0.8rem; font-weight: 500;
+      border: 1px solid var(--border); background: var(--raised); color: var(--sub);
+      cursor: pointer; font-family: inherit; transition: all .15s;
     }
-    .sub-header-label { font-size: 0.75rem; color: var(--color-dim); }
-    .sub-header-value { font-size: 0.75rem; color: var(--color-sub); }
+    .admin-btn:hover { border-color: var(--brand); color: var(--text); }
+    .theme-btn {
+      width: 2rem; height: 2rem; border-radius: 0.5rem;
+      border: 1px solid var(--border); background: var(--raised); color: var(--sub);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 0.875rem; transition: background .15s;
+    }
+    .theme-btn:hover { background: var(--border); }
 
-    /* ── Rep cards grid ── */
-    .rep-grid {
-      display: grid;
-      grid-template-columns: repeat(1, minmax(0, 1fr));
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-    @media (min-width: 48rem) {
-      .rep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @media (min-width: 64rem) {
-      .rep-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    }
+    /* ── Main ── */
+    .main { max-width: 90rem; margin: 0 auto; padding: 1.25rem; }
 
-    .rep-card {
-      background: var(--color-card);
-      border: 1px solid var(--color-divider);
-      border-radius: 1rem;
-      padding: 1.25rem 1.5rem;
-      overflow: hidden;
-      transition: border-color .2s;
-    }
-    .rep-card:hover { border-color: color-mix(in oklab, var(--color-brand) 40%, transparent); }
-
-    .rep-card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    /* ── Admin panel ── */
+    .admin-panel {
+      background: var(--card); border: 1px solid var(--brand);
+      border-radius: 0.75rem; padding: 1rem 1.25rem;
       margin-bottom: 1rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
     }
-    .rep-name {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--color-heading);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .admin-panel-label { font-size: 0.875rem; color: var(--sub); }
+    .admin-panel-label strong { color: var(--text); display: block; font-size: 0.8rem; margin-bottom: 0.2rem; }
+    .toggle-row { display: flex; align-items: center; gap: 0.75rem; }
+    .toggle-label { font-size: 0.8rem; color: var(--dim); }
+    .toggle-switch { position: relative; width: 2.75rem; height: 1.5rem; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--raised); border: 1px solid var(--border);
+      border-radius: 9999px; cursor: pointer; transition: background .2s, border-color .2s;
     }
-    .rep-rank-badge {
-      flex-shrink: 0;
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.125rem 0.5rem;
-      border-radius: 9999px;
-      background: var(--color-raised);
-      color: var(--color-dim);
-      margin-left: 0.5rem;
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 1.125rem; height: 1.125rem;
+      left: 0.1rem; top: 50%; transform: translateY(-50%);
+      background: #fff; border-radius: 50%; transition: transform .2s;
     }
-    .rep-rank-badge.rank-1 { background: rgba(251,191,36,.15); color: #fbbf24; }
-    .rep-rank-badge.rank-2 { background: rgba(148,163,184,.12); color: #94a3b8; }
-    .rep-rank-badge.rank-3 { background: rgba(180,120,60,.12);  color: #c8844a; }
+    .toggle-switch input:checked + .toggle-slider { background: var(--brand); border-color: var(--brand); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateY(-50%) translateX(1.25rem); }
+    .toggle-status { font-size: 0.75rem; font-weight: 600; }
+    .toggle-status.on  { color: #10b981; }
+    .toggle-status.off { color: #ef4444; }
 
-    /* ── Big call number ── */
-    .calls-number {
-      font-size: 1.875rem;
-      font-weight: 600;
-      letter-spacing: -0.025em;
-      font-variant-numeric: tabular-nums;
-      line-height: 1.2;
-      color: var(--color-heading);
-      margin-bottom: 0.25rem;
-    }
-    .calls-label {
-      font-size: 0.75rem;
-      color: var(--color-dim);
+    /* ── Custom date picker ── */
+    .custom-picker {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 0.75rem; padding: 1rem 1.25rem;
       margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .custom-picker label { font-size: 0.8rem; color: var(--sub); }
+    .custom-picker input[type="date"] {
+      padding: 0.375rem 0.75rem; border-radius: 0.375rem;
+      border: 1px solid var(--border); background: var(--raised); color: var(--text);
+      font-family: inherit; font-size: 0.8rem;
+    }
+    .apply-btn {
+      padding: 0.375rem 1rem; border-radius: 0.375rem;
+      border: none; background: var(--brand); color: #fff;
+      font-size: 0.8rem; font-weight: 500; cursor: pointer; font-family: inherit;
     }
 
-    /* ── Stat rows ── */
-    .stat-rows { display: flex; flex-direction: column; gap: 0.625rem; }
-    .stat-row {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 0.875rem; margin-bottom: 1rem;
     }
-    .stat-row-label { font-size: 0.75rem; color: var(--color-sub); }
-    .stat-row-value {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--color-heading);
-      font-variant-numeric: tabular-nums;
+    @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 560px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 0.75rem; padding: 1rem 1.25rem;
     }
-    .stat-row-value.brand { color: var(--color-brand); }
+    .stat-label { font-size: 0.72rem; color: var(--dim); margin-bottom: 0.4rem; }
+    .stat-value { font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    /* ── Progress bar ── */
-    .bar-track {
-      margin-top: 1rem;
-      height: 0.5rem;
-      background: var(--color-raised);
-      border-radius: 9999px;
-      overflow: hidden;
-    }
-    .bar-fill {
-      height: 100%;
-      background: var(--color-brand);
-      border-radius: 9999px;
-    }
+    /* ── Leaderboard ── */
+    .lb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.875rem; margin-bottom: 0.875rem; }
+    @media (max-width: 700px) { .lb-grid { grid-template-columns: 1fr; } }
 
-    /* ── Demos row (below rep grid) ── */
-    .demos-section { margin-bottom: 2rem; }
-    .section-title {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--color-dim);
-      margin-bottom: 0.75rem;
-    }
-    .demos-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 0.75rem;
-    }
-    .demo-card {
-      background: var(--color-card);
-      border: 1px solid var(--color-divider);
-      border-radius: 0.75rem;
-      padding: 1rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    .demo-name   { font-size: 0.8rem; font-weight: 500; color: var(--color-sub); }
-    .demo-number { font-size: 1.5rem; font-weight: 600; color: var(--color-emerald); font-variant-numeric: tabular-nums; }
+    .lb-card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; }
+    .lb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .lb-title  { font-size: 0.875rem; font-weight: 600; }
+    .lb-badge  { font-size: 0.7rem; color: var(--dim); background: var(--raised); padding: 0.15rem 0.5rem; border-radius: 9999px; }
 
-    /* ── Empty / loading state ── */
-    .empty {
-      min-height: 16rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      color: var(--color-dim);
-      text-align: center;
-      padding: 2rem;
+    .rep-row { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 0; }
+    .rep-row + .rep-row { border-top: 1px solid var(--border); }
+
+    .rank-dot {
+      width: 1.375rem; height: 1.375rem; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700;
+      background: var(--raised); color: var(--dim);
     }
-    .empty h2 { font-size: 1rem; font-weight: 500; color: var(--color-sub); }
-    .empty p  { font-size: 0.8rem; line-height: 1.6; max-width: 28rem; }
-    .empty code {
-      background: var(--color-raised);
-      border: 1px solid var(--color-divider);
-      border-radius: 0.375rem;
-      padding: 0.15rem 0.4rem;
-      font-size: 0.78rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    .rank-dot.r1 { background: var(--brand); color: #fff; }
+
+    .avatar {
+      width: 2rem; height: 2rem; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 700; color: #fff;
     }
 
-    /* ── Report link ── */
-    .report-link-row { margin-top: 0.5rem; }
-    .report-link {
-      font-size: 0.75rem;
-      color: var(--color-brand);
-      text-decoration: none;
+    .rep-mid { flex: 1; min-width: 0; }
+    .rep-name { font-size: 0.8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
+    .rep-bar-track { height: 0.2rem; background: var(--raised); border-radius: 9999px; overflow: hidden; }
+    .rep-bar-fill  { height: 100%; border-radius: 9999px; }
+
+    .rep-val { font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; text-align: right; min-width: 3.5rem; }
+    .rep-val.accent { color: var(--brand); }
+
+    /* ── Avg section ── */
+    .avg-card-outer { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; }
+    .avg-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .avg-title { font-size: 0.875rem; font-weight: 600; }
+    .avg-toggle { display: flex; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+    .avg-toggle-btn {
+      padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 500;
+      border: none; background: transparent; color: var(--dim);
+      cursor: pointer; font-family: inherit; transition: all .15s;
     }
-    .report-link:hover { text-decoration: underline; }
+    .avg-toggle-btn.active { background: var(--brand); color: #fff; }
+    .avg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.875rem; }
+    @media (max-width: 560px) { .avg-grid { grid-template-columns: 1fr; } }
+    .avg-inner { background: var(--raised); border-radius: 0.625rem; padding: 1rem 1.25rem; text-align: center; }
+    .avg-name  { font-size: 0.75rem; color: var(--sub); margin-bottom: 0.375rem; }
+    .avg-value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .avg-sub   { font-size: 0.7rem; color: var(--dim); margin-top: 0.2rem; }
+
+    /* ── Modal ── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 200; }
+    .overlay.hidden { display: none; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.75rem; width: 100%; max-width: 340px; }
+    .modal h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; }
+    .modal-field { margin-bottom: 0.875rem; }
+    .modal-field label { display: block; font-size: 0.75rem; color: var(--sub); margin-bottom: 0.375rem; }
+    .modal-field input {
+      width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem;
+      border: 1px solid var(--border); background: var(--raised); color: var(--text);
+      font-family: inherit; font-size: 0.875rem;
+    }
+    .modal-field input:focus { outline: none; border-color: var(--brand); }
+    .modal-err { font-size: 0.78rem; color: #ef4444; margin-bottom: 0.75rem; }
+    .modal-err.hidden { display: none; }
+    .modal-btns { display: flex; gap: 0.625rem; justify-content: flex-end; }
+    .btn-sec { padding: 0.45rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--raised); color: var(--sub); font-family: inherit; font-size: 0.8rem; cursor: pointer; }
+    .btn-pri { padding: 0.45rem 1rem; border-radius: 0.5rem; border: none; background: var(--brand); color: #fff; font-family: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer; }
+
+    /* ── Hidden / empty states ── */
+    .unavailable { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 55vh; gap: 0.875rem; color: var(--dim); text-align: center; padding: 2rem; }
+    .unavailable h2 { font-size: 1.125rem; font-weight: 500; color: var(--sub); }
+    .unavailable p  { font-size: 0.825rem; max-width: 28rem; line-height: 1.6; }
+    .loading { text-align: center; color: var(--dim); padding: 4rem 2rem; font-size: 0.875rem; }
+    .no-data { text-align: center; color: var(--dim); padding: 3rem 2rem; font-size: 0.875rem; }
   </style>
 </head>
 <body>
 
-<!-- Header -->
 <header class="header">
   <div class="header-inner">
     <div class="logo">
-      <img src="https://scoreboards-production.up.railway.app/costos-logo.png" alt="Cost-OS" onerror="this.style.display='none'" />
-      <span class="logo-text">Cost-OS Scoreboard</span>
+      <div class="logo-icon">C</div>
+      <div class="logo-label">
+        <strong>Cost·OS</strong>
+        <small>Scoreboard</small>
+      </div>
     </div>
-    <div class="header-right">
-      <span class="scraped-time" id="scrapedTime"></span>
-      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
-        <svg viewBox="0 0 20 20" fill="currentColor" id="themeIcon">
-          <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4.22 2.22a1 1 0 011.415 1.415l-.707.707a1 1 0 01-1.414-1.414l.706-.708zM18 9a1 1 0 110 2h-1a1 1 0 110-2h1zM14.95 14.95a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707zM11 17a1 1 0 11-2 0v-1a1 1 0 112 0v1zM5.757 14.243a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707zM3 11a1 1 0 110-2h1a1 1 0 110 2H3zM5.05 5.05A1 1 0 016.465 3.636l.707.707A1 1 0 015.757 5.757l-.707-.707zM10 7a3 3 0 100 6 3 3 0 000-6z"/>
-        </svg>
-      </button>
+
+    <div class="header-meta" id="headerMeta"></div>
+
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="today">Today</button>
+      <button class="tab-btn" data-tab="yesterday">Yesterday</button>
+      <button class="tab-btn" data-tab="current-week">Current Week</button>
+      <button class="tab-btn" data-tab="previous-week">Previous Week</button>
+      <button class="tab-btn" data-tab="this-month">This Month</button>
+      <button class="tab-btn" data-tab="custom">Custom</button>
+    </nav>
+
+    <div class="header-actions">
+      <button class="admin-btn" id="adminBtn" onclick="openAdminModal()">Admin</button>
+      <button class="theme-btn" onclick="toggleTheme()">☀</button>
     </div>
   </div>
 </header>
 
-<!-- Page body -->
-<div class="page">
+<div class="main" id="main">
+  <div class="loading">Loading…</div>
+</div>
 
-  <!-- Tabs -->
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="today"  onclick="switchTab('today')">Today</button>
-    <button class="tab-btn"        data-tab="weekly" onclick="switchTab('weekly')">This Week</button>
-  </div>
-
-  <!-- Dynamic content -->
-  <div id="content">
-    <div class="empty">
-      <h2>Loading…</h2>
+<!-- Admin PIN modal -->
+<div class="overlay hidden" id="overlay">
+  <div class="modal">
+    <h2>Admin Access</h2>
+    <div class="modal-field">
+      <label>PIN</label>
+      <input type="password" id="pinInput" placeholder="Enter admin PIN"
+             onkeydown="if(event.key==='Enter')doVerify()" autocomplete="off" />
+    </div>
+    <div class="modal-err hidden" id="pinErr">Incorrect PIN — try again.</div>
+    <div class="modal-btns">
+      <button class="btn-sec" onclick="closeModal()">Cancel</button>
+      <button class="btn-pri" onclick="doVerify()">Unlock</button>
     </div>
   </div>
-
 </div>
 
 <script>
-// ── State ───────────────────────────────────────────────────────────────────
-let DATA      = null;
-let activeTab = 'today';
+// ── State ─────────────────────────────────────────────────────────────────────
+let DATA       = null;
+let activeTab  = 'today';
+let avgMode    = 'talk';
+let displayOn  = true;
+let isAdmin    = sessionStorage.getItem('ca') === '1';
+let adminPin   = sessionStorage.getItem('cp') || '';
+let customFrom = '', customTo = '';
 
-// ── Theme ───────────────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────
 function toggleTheme() {
-  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('costos-theme', next);
+  const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('costos-theme', t);
 }
 
-// ── Tabs ────────────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  if (DATA) renderContent(DATA);
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtSec(s) {
   s = parseInt(s) || 0;
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
@@ -372,144 +311,319 @@ function fmtSec(s) {
   return `${sec}s`;
 }
 
-function fmtTs(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return 'Updated ' + d.toLocaleDateString('en-US', {month:'short',day:'numeric'})
-       + ' at ' + d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+function toYMD(d) { return d.toISOString().slice(0, 10); }
+
+const COLORS = ['#1271af','#0d9488','#7c3aed','#d97706','#dc2626','#059669','#c026d3'];
+function avatarColor(name) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return COLORS[Math.abs(h) % COLORS.length];
+}
+function initials(name) {
+  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function rankClass(i) { return ['rank-1','rank-2','rank-3'][i] || ''; }
-function rankLabel(i) { return ['#1','#2','#3'][i] || `#${i+1}`; }
+// ── Date ranges ───────────────────────────────────────────────────────────────
+function getRange(tab) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-// ── Render rep cards ────────────────────────────────────────────────────────
-function repGrid(reps, labelKey) {
-  if (!reps || !reps.length) {
-    return `<div class="empty"><h2>No data</h2><p>Run <code>python main.py</code> to generate data.</p></div>`;
+  if (tab === 'today') {
+    const s = toYMD(today); return [s, s];
   }
-  const sorted  = [...reps].sort((a,b) => b.totalCalls - a.totalCalls);
-  const maxCall = sorted[0].totalCalls || 1;
-
-  const cards = sorted.map((r, i) => {
-    const pct      = Math.round((r.totalCalls / maxCall) * 100);
-    const talkStr  = r.totalTalkTimeStr || fmtSec(r.totalTalkTimeSec);
-    const daysInfo = r.daysActive ? `<div class="stat-row"><span class="stat-row-label">Days active</span><span class="stat-row-value">${r.daysActive}</span></div>` : '';
-    return `
-      <div class="rep-card animate-slide-in" style="animation-delay:${i * 0.06}s">
-        <div class="rep-card-top">
-          <span class="rep-name">${r.name}</span>
-          <span class="rep-rank-badge ${rankClass(i)}">${rankLabel(i)}</span>
-        </div>
-        <div class="calls-number animate-count-up" style="animation-delay:${i * 0.06 + 0.1}s">
-          ${r.totalCalls.toLocaleString()}
-        </div>
-        <div class="calls-label">Total Calls</div>
-        <div class="stat-rows">
-          <div class="stat-row">
-            <span class="stat-row-label">Talk time</span>
-            <span class="stat-row-value brand">${talkStr}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-row-label">Avg / call</span>
-            <span class="stat-row-value">${fmtSec(r.avgTalkTimeSec)}</span>
-          </div>
-          ${daysInfo}
-        </div>
-        <div class="bar-track">
-          <div class="bar-fill animate-bar-grow" style="--bar-w:${pct}%"></div>
-        </div>
-      </div>`;
-  }).join('');
-
-  return `<div class="rep-grid">${cards}</div>`;
+  if (tab === 'yesterday') {
+    const y = new Date(today); y.setDate(y.getDate() - 1); const s = toYMD(y); return [s, s];
+  }
+  if (tab === 'current-week') {
+    const dow = today.getDay();
+    const mon = new Date(today); mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+    return [toYMD(mon), toYMD(today)];
+  }
+  if (tab === 'previous-week') {
+    const dow = today.getDay();
+    const thisMon = new Date(today); thisMon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+    const prevMon = new Date(thisMon); prevMon.setDate(thisMon.getDate() - 7);
+    const prevSun = new Date(prevMon); prevSun.setDate(prevMon.getDate() + 6);
+    return [toYMD(prevMon), toYMD(prevSun)];
+  }
+  if (tab === 'this-month') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    return [toYMD(first), toYMD(today)];
+  }
+  if (tab === 'custom') {
+    return [customFrom || toYMD(today), customTo || toYMD(today)];
+  }
+  return [toYMD(today), toYMD(today)];
 }
 
-// ── Render demos ─────────────────────────────────────────────────────────────
-function demosSection(demos) {
-  if (!demos || !demos.length) return '';
-  const cards = demos.map(d => `
-    <div class="demo-card">
-      <div class="demo-name">${d.name}</div>
-      <div class="demo-number">${d.demos}</div>
-    </div>`).join('');
-  return `
-    <div class="demos-section">
-      <div class="section-title">Demos</div>
-      <div class="demos-grid">${cards}</div>
+// ── Aggregate ─────────────────────────────────────────────────────────────────
+function aggregate(history, start, end) {
+  const map = {};
+  for (const snap of (history || [])) {
+    if (snap.date < start || snap.date > end) continue;
+    for (const r of (snap.reps || [])) {
+      if (!map[r.name]) map[r.name] = { name: r.name, totalCalls: 0, totalTalkTimeSec: 0, daysActive: 0 };
+      map[r.name].totalCalls       += r.totalCalls       || 0;
+      map[r.name].totalTalkTimeSec += r.totalTalkTimeSec || 0;
+      map[r.name].daysActive++;
+    }
+  }
+  return Object.values(map).map(r => ({
+    ...r,
+    avgTalkTimeSec: r.totalCalls ? Math.round(r.totalTalkTimeSec / r.totalCalls) : 0,
+    totalTalkTimeStr: fmtSec(r.totalTalkTimeSec),
+  }));
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    if (DATA) render();
+  });
+});
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const el = document.getElementById('main');
+
+  if (!displayOn && !isAdmin) {
+    el.innerHTML = `<div class="unavailable">
+      <svg width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/>
+      </svg>
+      <h2>Scoreboard is currently hidden</h2>
+      <p>The scoreboard is turned off right now. Check back later or ask your manager.</p>
     </div>`;
-}
-
-// ── Main render ──────────────────────────────────────────────────────────────
-function renderContent(data) {
-  const el = document.getElementById('content');
-
-  if (!data) {
-    el.innerHTML = `<div class="empty"><h2>No data found</h2>
-      <p>Run <code>python main.py</code> then open this file via a local server:<br>
-      <code>python -m http.server 8000</code></p></div>`;
     return;
   }
 
-  if (activeTab === 'today') {
-    const today = data.today || {};
-    const reps  = today.reps || [];
-    el.innerHTML = `
-      <div class="sub-header">
-        <span class="sub-header-label">Date</span>
-        <span class="sub-header-value">${today.reportDate || '—'}</span>
+  if (!DATA) { el.innerHTML = `<div class="loading">Loading data…</div>`; return; }
+
+  const [start, end] = getRange(activeTab);
+  let reps = aggregate(DATA.history, start, end);
+
+  // Fallback: today tab uses data.today if history is empty for today
+  if (activeTab === 'today' && reps.length === 0 && DATA.today && DATA.today.reps) {
+    reps = DATA.today.reps.map(r => ({...r, daysActive: 1}));
+  }
+
+  // Stats
+  const totalCalls = reps.reduce((a, r) => a + r.totalCalls, 0);
+  const totalTalk  = reps.reduce((a, r) => a + r.totalTalkTimeSec, 0);
+  const avgTalk    = totalCalls ? Math.round(totalTalk / totalCalls) : 0;
+  const activeReps = reps.filter(r => r.totalCalls > 0).length;
+
+  const byCall = [...reps].sort((a, b) => b.totalCalls - a.totalCalls);
+  const byTalk = [...reps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
+  const maxCall = byCall[0]?.totalCalls || 1;
+  const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
+
+  function repRow(r, rank, value, maxVal, isTime) {
+    const pct   = Math.round((value / maxVal) * 100);
+    const color = avatarColor(r.name);
+    const disp  = isTime ? fmtSec(value) : value.toLocaleString();
+    return `<div class="rep-row">
+      <div class="rank-dot ${rank === 1 ? 'r1' : ''}">${rank}</div>
+      <div class="avatar" style="background:${color}">${initials(r.name)}</div>
+      <div class="rep-mid">
+        <div class="rep-name">${r.name}</div>
+        <div class="rep-bar-track">
+          <div class="rep-bar-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
       </div>
-      ${repGrid(reps)}
-      ${demosSection(data.weekly && data.weekly.demos)}
-      ${data.reportUrl ? `<div class="report-link-row"><a class="report-link" href="${data.reportUrl}" target="_blank" rel="noopener">View source report ↗</a></div>` : ''}`;
-  } else {
-    const weekly = data.weekly || {};
-    const reps   = weekly.reps || [];
-    el.innerHTML = `
-      <div class="sub-header">
-        <span class="sub-header-label">Date range</span>
-        <span class="sub-header-value">${weekly.dateRange || '—'}  (${weekly.daysCount || 0} day${weekly.daysCount !== 1 ? 's' : ''})</span>
+      <div class="rep-val${isTime ? ' accent' : ''}">${disp}</div>
+    </div>`;
+  }
+
+  const avgSorted = [...reps].sort((a, b) =>
+    avgMode === 'talk' ? b.avgTalkTimeSec - a.avgTalkTimeSec : b.totalCalls - a.totalCalls
+  );
+
+  const emptyRows = reps.length === 0
+    ? `<div class="no-data">No data for this period yet.</div>`
+    : '';
+
+  el.innerHTML = `
+    ${activeTab === 'custom' ? `
+    <div class="custom-picker">
+      <label>From</label>
+      <input type="date" id="cfrom" value="${customFrom}" />
+      <label>To</label>
+      <input type="date" id="cto" value="${customTo}" />
+      <button class="apply-btn" onclick="applyCustom()">Apply</button>
+    </div>` : ''}
+
+    ${isAdmin ? `
+    <div class="admin-panel">
+      <div class="admin-panel-label">
+        <strong>Admin Controls</strong>
+        Manage scoreboard visibility for your team
       </div>
-      ${repGrid(reps)}
-      ${demosSection(weekly.demos)}
-      ${data.reportUrl ? `<div class="report-link-row"><a class="report-link" href="${data.reportUrl}" target="_blank" rel="noopener">View source report ↗</a></div>` : ''}`;
+      <div class="toggle-row">
+        <span class="toggle-label">Scoreboard visible</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="dispToggle" ${displayOn ? 'checked' : ''} onchange="setDisplay(this.checked)" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-status ${displayOn ? 'on' : 'off'}" id="toggleStatus">${displayOn ? 'ON' : 'OFF'}</span>
+      </div>
+    </div>` : ''}
+
+    ${emptyRows}
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Team Total Calls</div><div class="stat-value">${totalCalls.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">Team Talk Time</div><div class="stat-value">${fmtSec(totalTalk)}</div></div>
+      <div class="stat-card"><div class="stat-label">Team Avg Talk Time</div><div class="stat-value">${fmtSec(avgTalk)}</div></div>
+      <div class="stat-card"><div class="stat-label">Monthly Demos</div><div class="stat-value">—</div></div>
+      <div class="stat-card"><div class="stat-label">Active Reps</div><div class="stat-value">${activeReps}</div></div>
+    </div>
+
+    <div class="lb-grid">
+      <div class="lb-card">
+        <div class="lb-header">
+          <span class="lb-title">Total Calls</span>
+          <span class="lb-badge">${byCall.length} reps</span>
+        </div>
+        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false)).join('')}
+      </div>
+      <div class="lb-card">
+        <div class="lb-header">
+          <span class="lb-title">Total Talk Time</span>
+          <span class="lb-badge">${byTalk.length} reps</span>
+        </div>
+        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true)).join('')}
+      </div>
+    </div>
+
+    <div class="avg-card-outer">
+      <div class="avg-header">
+        <span class="avg-title">Average Talk Time</span>
+        <div class="avg-toggle">
+          <button class="avg-toggle-btn ${avgMode === 'talk' ? 'active' : ''}" onclick="setAvg('talk')">Talk Time</button>
+          <button class="avg-toggle-btn ${avgMode === 'calls' ? 'active' : ''}" onclick="setAvg('calls')">Avg Calls</button>
+        </div>
+      </div>
+      <div class="avg-grid">
+        ${avgSorted.map(r => {
+          const val = avgMode === 'talk' ? fmtSec(r.avgTalkTimeSec) : r.totalCalls.toLocaleString();
+          const sub = avgMode === 'talk' ? 'avg per call' : 'total calls';
+          return `<div class="avg-inner">
+            <div class="avg-name">${r.name}</div>
+            <div class="avg-value">${val}</div>
+            <div class="avg-sub">${sub}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function setAvg(mode) { avgMode = mode; if (DATA) render(); }
+
+function applyCustom() {
+  customFrom = document.getElementById('cfrom')?.value || '';
+  customTo   = document.getElementById('cto')?.value   || '';
+  if (DATA) render();
+}
+
+// ── Admin modal ───────────────────────────────────────────────────────────────
+function openAdminModal() {
+  if (isAdmin) { render(); return; }
+  document.getElementById('overlay').classList.remove('hidden');
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinErr').classList.add('hidden');
+  setTimeout(() => document.getElementById('pinInput').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.add('hidden');
+}
+
+async function doVerify() {
+  const pin = document.getElementById('pinInput').value.trim();
+  if (!pin) return;
+  try {
+    const res = await fetch('/api/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    if (res.status === 403) {
+      document.getElementById('pinErr').classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    isAdmin   = true;
+    adminPin  = pin;
+    displayOn = data.displayOn;
+    sessionStorage.setItem('ca', '1');
+    sessionStorage.setItem('cp', pin);
+    closeModal();
+    render();
+  } catch (e) {
+    document.getElementById('pinErr').textContent = 'Connection error.';
+    document.getElementById('pinErr').classList.remove('hidden');
   }
 }
 
-// ── Bootstrap ────────────────────────────────────────────────────────────────
-fetch('data.json?t=' + Date.now())
-  .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
-  .then(data => {
-    DATA = data;
-    if (data.scrapedAt) {
-      document.getElementById('scrapedTime').textContent = fmtTs(data.scrapedAt);
-    }
-    renderContent(data);
-  })
-  .catch(() => {
-    document.getElementById('content').innerHTML = `
-      <div class="empty">
-        <h2>data.json not found</h2>
-        <p>
-          1. Run <code>python main.py</code> to generate data<br>
-          2. Serve this folder: <code>python -m http.server 8000</code><br>
-          3. Open <code>http://localhost:8000</code>
-        </p>
-      </div>`;
-  });
+async function setDisplay(on) {
+  try {
+    const res = await fetch('/api/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: adminPin, on }),
+    });
+    if (res.status === 403) { isAdmin = false; sessionStorage.removeItem('ca'); openAdminModal(); return; }
+    const data = await res.json();
+    displayOn = data.on;
+    const s = document.getElementById('toggleStatus');
+    if (s) { s.textContent = displayOn ? 'ON' : 'OFF'; s.className = `toggle-status ${displayOn ? 'on' : 'off'}`; }
+  } catch (e) { console.error(e); }
+}
 
-// Auto-refresh every 60 seconds
-setInterval(() => {
-  fetch('data.json?t=' + Date.now())
-    .then(r => r.json())
-    .then(data => {
-      DATA = data;
-      if (data.scrapedAt) {
-        document.getElementById('scrapedTime').textContent = fmtTs(data.scrapedAt);
-      }
-      renderContent(data);
-    })
-    .catch(() => {});
-}, 60_000);
+// ── Header clock ──────────────────────────────────────────────────────────────
+function updateMeta() {
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  let html = `${dateStr} · ${timeStr}`;
+  if (DATA?.scrapedAt) {
+    const upd = new Date(DATA.scrapedAt);
+    html += ` · <span class="updated">Data updated ${upd.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>`;
+  }
+  document.getElementById('headerMeta').innerHTML = html;
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const sr = await fetch('/api/display-status');
+    if (sr.ok) { const s = await sr.json(); displayOn = s.on; }
+  } catch (_) {}
+
+  try {
+    const r = await fetch('data.json?t=' + Date.now());
+    if (!r.ok) throw new Error();
+    DATA = await r.json();
+    updateMeta();
+    render();
+  } catch (_) {
+    document.getElementById('main').innerHTML = `<div class="loading">Scraper is warming up — data will appear shortly.</div>`;
+  }
+}
+
+// Restore admin session
+if (isAdmin) {
+  fetch('/api/display-status').then(r => r.ok ? r.json() : null).then(d => { if (d) displayOn = d.on; }).catch(() => {});
+}
+
+updateMeta();
+setInterval(updateMeta, 30_000);
+load();
+setInterval(load, 60_000);
 </script>
 </body>
 </html>
