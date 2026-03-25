@@ -74,13 +74,6 @@
     .tab-btn.active { background: var(--brand); color: #fff; }
 
     .header-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-    .admin-btn {
-      padding: 0.35rem 0.875rem; border-radius: 0.5rem;
-      font-size: 0.8rem; font-weight: 500;
-      border: 1px solid var(--border); background: var(--raised); color: var(--sub);
-      cursor: pointer; font-family: inherit; transition: all .15s;
-    }
-    .admin-btn:hover { border-color: var(--brand); color: var(--text); }
     .theme-btn {
       width: 2rem; height: 2rem; border-radius: 0.5rem;
       border: 1px solid var(--border); background: var(--raised); color: var(--sub);
@@ -258,7 +251,6 @@
     </nav>
 
     <div class="header-actions">
-      <button class="admin-btn" id="adminBtn" onclick="openAdminModal()">Admin</button>
       <button class="theme-btn" onclick="toggleTheme()">☀</button>
     </div>
   </div>
@@ -268,22 +260,6 @@
   <div class="loading">Loading…</div>
 </div>
 
-<!-- Admin PIN modal -->
-<div class="overlay hidden" id="overlay">
-  <div class="modal">
-    <h2>Admin Access</h2>
-    <div class="modal-field">
-      <label>PIN</label>
-      <input type="password" id="pinInput" placeholder="Enter admin PIN"
-             onkeydown="if(event.key==='Enter')doVerify()" autocomplete="off" />
-    </div>
-    <div class="modal-err hidden" id="pinErr">Incorrect PIN — try again.</div>
-    <div class="modal-btns">
-      <button class="btn-sec" onclick="closeModal()">Cancel</button>
-      <button class="btn-pri" onclick="doVerify()">Unlock</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────

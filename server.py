@@ -58,6 +58,11 @@ def data():
     return send_file(DATA_FILE, mimetype="application/json")
 
 
+@app.route("/admin")
+def admin():
+    return send_file(os.path.join(DIR, "admin.html"))
+
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
@@ -86,6 +91,29 @@ def toggle_display():
         _display_on = bool(body.get("on", not _display_on))
     log.info("Display toggled → %s", _display_on)
     return jsonify({"on": _display_on})
+
+
+_scrape_running = False
+
+@app.route("/api/scrape-now", methods=["POST"])
+def scrape_now():
+    global _scrape_running
+    body = flask_request.get_json(silent=True) or {}
+    if body.get("pin") != ADMIN_PIN:
+        return jsonify({"error": "forbidden"}), 403
+    if _scrape_running:
+        return jsonify({"started": False, "reason": "Scrape already in progress"})
+
+    def _run():
+        global _scrape_running
+        _scrape_running = True
+        try:
+            run_scrape()
+        finally:
+            _scrape_running = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"started": True})
 
 
 # ── Gmail Auth (env-var first, fallback to files) ─────────────────────────────

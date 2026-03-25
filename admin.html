@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cost-OS Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('costos-theme') || 'dark')</script>
+  <style>
+    :root {
+      --page:    #0a0e17;
+      --card:    #111827;
+      --raised:  #1a2235;
+      --divider: #243049;
+      --field:   #1e293b;
+      --heading: #ffffff;
+      --sub:     #94a3b8;
+      --dim:     #64748b;
+      --brand:   #1271af;
+      --brand-h: #0e5a8a;
+    }
+    [data-theme="light"] {
+      --page:    #f0f4f8;
+      --card:    #ffffff;
+      --raised:  #edf2f7;
+      --divider: #d0dae7;
+      --field:   #e2e8f0;
+      --heading: #0f1b2d;
+      --sub:     #546782;
+      --dim:     #8a9ab7;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--page); color: var(--heading); min-height: 100vh; }
+
+    /* ── PIN Gate ── */
+    #pinGate {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 2rem;
+    }
+    .pin-card {
+      background: var(--card); border: 1px solid var(--divider); border-radius: 1.25rem;
+      padding: 2.5rem; width: 100%; max-width: 380px; text-align: center;
+    }
+    .pin-logo {
+      width: 3rem; height: 3rem; border-radius: 0.625rem; background: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0 auto 1.25rem;
+    }
+    .pin-card h1 { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.375rem; }
+    .pin-card h1 span { color: var(--brand); }
+    .pin-card p { font-size: 0.8rem; color: var(--sub); margin-bottom: 1.75rem; }
+    .pin-input {
+      width: 100%; padding: 0.75rem 1rem; border-radius: 0.625rem;
+      border: 1px solid var(--divider); background: var(--raised); color: var(--heading);
+      font-family: inherit; font-size: 1rem; text-align: center; letter-spacing: 0.25em;
+      margin-bottom: 0.75rem;
+    }
+    .pin-input:focus { outline: none; border-color: var(--brand); }
+    .pin-err { font-size: 0.78rem; color: #ef4444; margin-bottom: 0.75rem; min-height: 1.2em; }
+    .pin-submit {
+      width: 100%; padding: 0.75rem; border-radius: 0.625rem; border: none;
+      background: var(--brand); color: #fff; font-family: inherit;
+      font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background .15s;
+    }
+    .pin-submit:hover { background: var(--brand-h); }
+
+    /* ── Dashboard ── */
+    #dashboard { display: none; }
+
+    .topbar {
+      background: color-mix(in srgb, var(--card) 80%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--divider);
+      padding: 0 1.5rem; height: 3.75rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 0.75rem; }
+    .topbar-logo {
+      width: 1.875rem; height: 1.875rem; border-radius: 0.375rem; background: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.875rem; font-weight: 800; color: #fff; flex-shrink: 0;
+    }
+    .topbar h1 { font-size: 1.125rem; font-weight: 800; }
+    .topbar h1 span { color: var(--brand); }
+    .topbar-right { display: flex; align-items: center; gap: 1rem; }
+    .topbar a { color: var(--sub); text-decoration: none; font-size: 0.875rem; font-weight: 600; transition: color .15s; }
+    .topbar a:hover { color: var(--brand); }
+    .theme-btn {
+      width: 2.25rem; height: 2.25rem; border-radius: 0.5rem;
+      border: 1px solid var(--divider); background: var(--card); color: var(--sub);
+      cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s;
+    }
+    .theme-btn:hover { color: var(--heading); border-color: var(--brand); }
+    .theme-btn svg { width: 1.125rem; height: 1.125rem; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card); border: 1px solid var(--divider);
+      border-radius: 1rem; padding: 1.5rem; margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: 1rem; font-weight: 700; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 0.625rem;
+    }
+    .card-title .icon { font-size: 1.25rem; }
+    .desc { color: var(--sub); font-size: 0.8rem; margin-bottom: 1rem; }
+
+    /* ── Status pills ── */
+    .status-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .status-pill {
+      background: var(--raised); border-radius: 0.625rem; padding: 0.75rem 1.125rem;
+      flex: 1; min-width: 130px;
+    }
+    .status-pill .label { font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    .status-pill .value { font-size: 1.125rem; font-weight: 700; margin-top: 0.25rem; }
+    .value.green { color: #10b981; }
+    .value.red   { color: #ef4444; }
+    .value.blue  { color: var(--brand); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.625rem 1.25rem; border-radius: 0.625rem; border: none;
+      font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-brand { background: var(--brand); color: #fff; }
+    .btn-brand:hover { background: var(--brand-h); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(18,113,175,.3); }
+    .btn-brand:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .spinner {
+      display: none; width: 1rem; height: 1rem;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .6s linear infinite;
+    }
+    .btn.loading .spinner { display: block; }
+    .btn.loading .btn-text { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Access links ── */
+    .link-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: var(--raised); border-radius: 0.625rem; padding: 0.875rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .link-row .link-label { font-size: 0.8rem; font-weight: 600; color: var(--sub); min-width: 9rem; flex-shrink: 0; }
+    .link-url {
+      flex: 1; font-size: 0.8rem; color: var(--brand); font-family: ui-monospace, monospace;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .copy-btn {
+      padding: 0.3rem 0.75rem; border-radius: 0.375rem;
+      border: 1px solid var(--divider); background: var(--card); color: var(--sub);
+      font-size: 0.75rem; font-weight: 500; cursor: pointer; font-family: inherit; flex-shrink: 0;
+      transition: all .15s;
+    }
+    .copy-btn:hover { border-color: var(--brand); color: var(--heading); }
+
+    /* ── Display toggle ── */
+    .toggle-section {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--raised); border-radius: 0.625rem; padding: 0.875rem 1rem;
+      margin-top: 0.5rem;
+    }
+    .toggle-info strong { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .toggle-info span   { font-size: 0.775rem; color: var(--sub); }
+    .toggle-wrap { display: flex; align-items: center; gap: 0.625rem; }
+    .toggle-status { font-size: 0.75rem; font-weight: 700; }
+    .toggle-status.on  { color: #10b981; }
+    .toggle-status.off { color: #ef4444; }
+    .tswitch { position: relative; width: 2.75rem; height: 1.5rem; }
+    .tswitch input { opacity: 0; width: 0; height: 0; }
+    .tslider {
+      position: absolute; inset: 0; background: var(--field);
+      border: 1px solid var(--divider); border-radius: 9999px; cursor: pointer; transition: all .2s;
+    }
+    .tslider::before {
+      content: ''; position: absolute;
+      width: 1.125rem; height: 1.125rem; left: 0.125rem; top: 50%;
+      transform: translateY(-50%); background: #fff; border-radius: 50%; transition: transform .2s;
+    }
+    .tswitch input:checked + .tslider { background: var(--brand); border-color: var(--brand); }
+    .tswitch input:checked + .tslider::before { transform: translateY(-50%) translateX(1.25rem); }
+
+    /* ── Chart ── */
+    .chart-controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .tab-row {
+      display: flex; background: var(--raised); border-radius: 0.5rem; padding: 3px; gap: 2px;
+    }
+    .tab-btn {
+      padding: 0.375rem 0.875rem; border-radius: 0.375rem; border: none;
+      font-family: inherit; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; background: transparent; color: var(--dim);
+    }
+    .tab-btn.active { background: var(--brand); color: #fff; }
+    .tab-btn:hover:not(.active) { color: var(--heading); }
+    .chart-wrap { position: relative; height: 300px; }
+    .chart-legend { display: flex; gap: 1.25rem; margin-top: 0.75rem; justify-content: center; flex-wrap: wrap; }
+    .leg-item { display: flex; align-items: center; gap: 0.375rem; font-size: 0.8rem; font-weight: 600; }
+    .leg-dot { width: 0.625rem; height: 0.625rem; border-radius: 50%; }
+    .live-dot { width: 0.5rem; height: 0.5rem; background: #10b981; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+    .live-label { font-size: 0.75rem; color: #10b981; font-weight: 600; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .chart-empty { text-align: center; color: var(--dim); padding: 3rem 1rem; }
+    .chart-empty .big { font-size: 2.5rem; opacity: .3; margin-bottom: 0.5rem; }
+
+    /* ── Rep analytics ── */
+    .analytics-rep {
+      background: var(--raised); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 0.75rem;
+    }
+    .analytics-rep-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .rep-avatar {
+      width: 2.5rem; height: 2.5rem; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .rep-full-name { font-size: 0.9rem; font-weight: 700; }
+    .rep-meta { font-size: 0.75rem; color: var(--sub); }
+    .rep-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+    @media (max-width: 600px) { .rep-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .rep-stat { background: var(--card); border-radius: 0.5rem; padding: 0.75rem; }
+    .rep-stat .sl { font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 0.25rem; }
+    .rep-stat .sv { font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      padding: 0.875rem 1.5rem; border-radius: 0.75rem;
+      font-weight: 600; font-size: 0.875rem;
+      transform: translateY(100px); opacity: 0; transition: all .3s; z-index: 999;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: #059669; color: #fff; }
+    .toast.error   { background: #dc2626; color: #fff; }
+
+    /* ── Scrape result ── */
+    #scrapeResult { margin-top: 0.75rem; font-size: 0.8rem; color: var(--sub); min-height: 1.2em; }
+  </style>
+</head>
+<body>
+
+<!-- ── PIN Gate ── -->
+<div id="pinGate">
+  <div class="pin-card">
+    <div class="pin-logo">C</div>
+    <h1>Cost·<span>OS</span></h1>
+    <p>Enter your admin PIN to access the control panel.</p>
+    <input class="pin-input" type="password" id="pinInput" placeholder="••••••••"
+           onkeydown="if(event.key==='Enter')doPin()" autocomplete="off" />
+    <div class="pin-err" id="pinErr"></div>
+    <button class="pin-submit" onclick="doPin()">Unlock Admin Panel</button>
+  </div>
+</div>
+
+<!-- ── Dashboard ── -->
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">C</div>
+      <h1>Admin <span>Panel</span></h1>
+    </div>
+    <div class="topbar-right">
+      <a href="/">Back to Scoreboard</a>
+      <button class="theme-btn" onclick="toggleTheme()">
+        <svg id="sunIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg id="moonIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- System Status -->
+    <div class="card">
+      <div class="card-title"><span class="icon">⚡</span> System Status</div>
+      <div class="status-row">
+        <div class="status-pill">
+          <div class="label">Status</div>
+          <div class="value green" id="sHealth">—</div>
+        </div>
+        <div class="status-pill">
+          <div class="label">Last Scrape</div>
+          <div class="value blue" id="sLast">—</div>
+        </div>
+        <div class="status-pill">
+          <div class="label">Next Scrape</div>
+          <div class="value blue" id="sNext">—</div>
+        </div>
+        <div class="status-pill">
+          <div class="label">Reps Today</div>
+          <div class="value" id="sReps">—</div>
+        </div>
+        <div class="status-pill">
+          <div class="label">History Days</div>
+          <div class="value" id="sDays">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Force Refresh -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🔄</span> Force Refresh</div>
+      <p class="desc">Pull fresh data from Nextiva right now without waiting for the next scheduled scrape.</p>
+      <button class="btn btn-brand" id="scrapeBtn" onclick="doScrape()">
+        <span class="spinner"></span>
+        <span class="btn-text">Scrape Now</span>
+      </button>
+      <div id="scrapeResult"></div>
+    </div>
+
+    <!-- Access Links -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🔗</span> Access Links</div>
+      <p class="desc">Share the scoreboard link with your team. Keep the admin link private.</p>
+      <div class="link-row">
+        <span class="link-label">Scoreboard (team)</span>
+        <span class="link-url" id="scoreboardUrl">—</span>
+        <button class="copy-btn" onclick="copyLink('scoreboardUrl')">Copy</button>
+      </div>
+      <div class="link-row">
+        <span class="link-label">Admin (private)</span>
+        <span class="link-url" id="adminUrl">—</span>
+        <button class="copy-btn" onclick="copyLink('adminUrl')">Copy</button>
+      </div>
+      <div class="toggle-section">
+        <div class="toggle-info">
+          <strong>Rep Scoreboard Access</strong>
+          <span>Turn off to hide the scoreboard from your team</span>
+        </div>
+        <div class="toggle-wrap">
+          <span class="toggle-status" id="dispStatus">ON</span>
+          <label class="tswitch">
+            <input type="checkbox" id="dispToggle" checked onchange="setDisplay(this.checked)" />
+            <span class="tslider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Chart -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📈</span> Activity</div>
+      <div class="chart-controls">
+        <div class="tab-row">
+          <button class="tab-btn active" id="tabCalls" onclick="setMetric('calls')">Calls</button>
+          <button class="tab-btn" id="tabTalk" onclick="setMetric('talk')">Talk Time</button>
+        </div>
+        <span class="live-dot"></span>
+        <span class="live-label">LIVE</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="actChart"></canvas>
+        <div id="chartEmpty" class="chart-empty" style="display:none">
+          <div class="big">📊</div>
+          <div>No history data yet</div>
+          <div style="font-size:.75rem;margin-top:.375rem;color:var(--dim)">Data accumulates over daily scrapes.</div>
+        </div>
+      </div>
+      <div id="chartLegend" class="chart-legend"></div>
+    </div>
+
+    <!-- Rep Analytics -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📊</span> Rep Analytics</div>
+      <p class="desc">Performance insights based on all available history.</p>
+      <div id="repAnalytics"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let PIN      = sessionStorage.getItem('cp') || '';
+let DATA     = null;
+let dispOn   = true;
+let metric   = 'calls';
+let chartInst = null;
+
+const COLORS = ['#1271af','#0d9488','#7c3aed','#d97706','#dc2626','#059669'];
+function avatarColor(n) {
+  let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return COLORS[Math.abs(h) % COLORS.length];
+}
+function initials(n) { return n.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('costos-theme', t);
+  document.getElementById('sunIcon').style.display  = t === 'dark' ? '' : 'none';
+  document.getElementById('moonIcon').style.display = t === 'light' ? '' : 'none';
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  if (DATA) renderChart();
+}
+
+// ── PIN ───────────────────────────────────────────────────────────────────────
+async function doPin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  if (!pin) return;
+  try {
+    const r = await fetch('/api/verify-pin', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pin }),
+    });
+    if (r.status === 403) {
+      document.getElementById('pinErr').textContent = 'Incorrect PIN — try again.';
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinInput').focus();
+      return;
+    }
+    const d = await r.json();
+    PIN    = pin;
+    dispOn = d.displayOn;
+    sessionStorage.setItem('ca', '1');
+    sessionStorage.setItem('cp', pin);
+    document.getElementById('pinGate').style.display    = 'none';
+    document.getElementById('dashboard').style.display  = '';
+    init();
+  } catch(e) {
+    document.getElementById('pinErr').textContent = 'Connection error.';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  const base = window.location.origin;
+  document.getElementById('scoreboardUrl').textContent = base + '/';
+  document.getElementById('adminUrl').textContent      = base + '/admin';
+
+  await loadData();
+  updateDisplayToggle();
+}
+
+async function loadData() {
+  try {
+    const r = await fetch('data.json?t=' + Date.now());
+    if (!r.ok) return;
+    DATA = await r.json();
+    updateStatus();
+    renderChart();
+    renderAnalytics();
+  } catch(_) {}
+
+  try {
+    const r = await fetch('/api/display-status');
+    if (r.ok) { const d = await r.json(); dispOn = d.on; updateDisplayToggle(); }
+  } catch(_) {}
+}
+
+// ── Status card ───────────────────────────────────────────────────────────────
+function fmtSec(s) {
+  s = parseInt(s)||0;
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(h) return `${h}h ${m}m ${sec}s`;
+  if(m) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+function fmtTs(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+}
+
+function updateStatus() {
+  if (!DATA) return;
+  document.getElementById('sHealth').textContent = '✓ Online';
+  document.getElementById('sLast').textContent   = fmtTs(DATA.scrapedAt);
+  // Next scrape = last scrape + 15 min
+  if (DATA.scrapedAt) {
+    const next = new Date(new Date(DATA.scrapedAt).getTime() + 15 * 60 * 1000);
+    document.getElementById('sNext').textContent = next.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+  }
+  document.getElementById('sReps').textContent = (DATA.today?.reps?.length || 0);
+  document.getElementById('sDays').textContent = (DATA.history?.length || 0);
+}
+
+// ── Force scrape ──────────────────────────────────────────────────────────────
+async function doScrape() {
+  const btn = document.getElementById('scrapeBtn');
+  const res = document.getElementById('scrapeResult');
+  btn.classList.add('loading'); btn.disabled = true;
+  res.textContent = 'Scraping Nextiva…';
+  try {
+    const r = await fetch('/api/scrape-now', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pin: PIN }),
+    });
+    if (r.status === 403) { res.textContent = 'PIN rejected.'; return; }
+    const d = await r.json();
+    if (d.started) {
+      res.textContent = 'Scrape started — refreshing data in 10 seconds…';
+      setTimeout(async () => { await loadData(); res.textContent = 'Done! Data refreshed.'; }, 10000);
+    } else {
+      res.textContent = d.reason || 'Could not start scrape.';
+    }
+  } catch(e) {
+    res.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
+// ── Display toggle ────────────────────────────────────────────────────────────
+function updateDisplayToggle() {
+  const el = document.getElementById('dispToggle');
+  const st = document.getElementById('dispStatus');
+  if (el) el.checked = dispOn;
+  if (st) { st.textContent = dispOn ? 'ON' : 'OFF'; st.className = `toggle-status ${dispOn ? 'on' : 'off'}`; }
+}
+
+async function setDisplay(on) {
+  try {
+    const r = await fetch('/api/toggle', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pin: PIN, on }),
+    });
+    if (!r.ok) { showToast('PIN rejected', 'error'); return; }
+    const d = await r.json();
+    dispOn = d.on;
+    updateDisplayToggle();
+    showToast(dispOn ? 'Scoreboard is now visible to team' : 'Scoreboard hidden from team', 'success');
+  } catch(e) {
+    showToast('Error updating display', 'error');
+  }
+}
+
+// ── Copy links ────────────────────────────────────────────────────────────────
+function copyLink(id) {
+  const txt = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(txt).then(() => showToast('Copied to clipboard', 'success'));
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function setMetric(m) {
+  metric = m;
+  document.getElementById('tabCalls').classList.toggle('active', m === 'calls');
+  document.getElementById('tabTalk').classList.toggle('active', m === 'talk');
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  renderChart();
+}
+
+function renderChart() {
+  const history = DATA?.history;
+  const empty   = document.getElementById('chartEmpty');
+  if (!history || history.length === 0) {
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const days    = [...history].sort((a,b) => a.date.localeCompare(b.date)).slice(-14);
+  const labels  = days.map(d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', {month:'short',day:'numeric'}));
+  const repNames = [...new Set(days.flatMap(d => d.reps.map(r => r.name)))];
+  const isDark   = document.documentElement.getAttribute('data-theme') !== 'light';
+
+  const datasets = repNames.map((name, i) => ({
+    label: name,
+    data: days.map(d => {
+      const rep = d.reps.find(r => r.name === name);
+      if (!rep) return 0;
+      return metric === 'calls' ? rep.totalCalls : Math.round(rep.totalTalkTimeSec / 60);
+    }),
+    backgroundColor: avatarColor(name),
+    borderRadius: 4,
+    borderSkipped: false,
+  }));
+
+  const ctx = document.getElementById('actChart').getContext('2d');
+  chartInst = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: {
+          label: ctx => {
+            const val = ctx.parsed.y;
+            if (metric === 'talk') return ` ${ctx.dataset.label}: ${fmtSec(val * 60)}`;
+            return ` ${ctx.dataset.label}: ${val} calls`;
+          }
+        }
+      }},
+      scales: {
+        x: { grid: { color: isDark ? '#243049' : '#d0dae7' }, ticks: { color: isDark ? '#64748b' : '#8a9ab7', font: { size: 11 } } },
+        y: { grid: { color: isDark ? '#243049' : '#d0dae7' }, ticks: {
+          color: isDark ? '#64748b' : '#8a9ab7', font: { size: 11 },
+          callback: v => metric === 'talk' ? fmtSec(v * 60) : v
+        }, beginAtZero: true },
+      },
+    },
+  });
+
+  // Legend
+  const legendEl = document.getElementById('chartLegend');
+  legendEl.innerHTML = repNames.map(n => `
+    <div class="leg-item">
+      <div class="leg-dot" style="background:${avatarColor(n)}"></div>
+      ${n}
+    </div>`).join('');
+}
+
+// ── Rep Analytics ─────────────────────────────────────────────────────────────
+function renderAnalytics() {
+  const el = document.getElementById('repAnalytics');
+  if (!DATA?.history?.length) { el.innerHTML = `<div style="text-align:center;color:var(--dim);padding:2rem">No history data yet.</div>`; return; }
+
+  const repMap = {};
+  for (const snap of DATA.history) {
+    for (const r of snap.reps) {
+      if (!repMap[r.name]) repMap[r.name] = { name: r.name, days: [] };
+      repMap[r.name].days.push({ date: snap.date, calls: r.totalCalls, talkSec: r.totalTalkTimeSec });
+    }
+  }
+
+  el.innerHTML = Object.values(repMap).map(rep => {
+    const totalCalls = rep.days.reduce((a, d) => a + d.calls, 0);
+    const totalTalk  = rep.days.reduce((a, d) => a + d.talkSec, 0);
+    const avgCalls   = Math.round(totalCalls / rep.days.length);
+    const avgTalkSec = totalCalls ? Math.round(totalTalk / totalCalls) : 0;
+    const color      = avatarColor(rep.name);
+    return `
+      <div class="analytics-rep">
+        <div class="analytics-rep-header">
+          <div class="rep-avatar" style="background:${color}">${initials(rep.name)}</div>
+          <div>
+            <div class="rep-full-name">${rep.name}</div>
+            <div class="rep-meta">${rep.days.length} active day${rep.days.length !== 1 ? 's' : ''} tracked</div>
+          </div>
+        </div>
+        <div class="rep-stats-grid">
+          <div class="rep-stat"><div class="sl">Total Calls</div><div class="sv">${totalCalls.toLocaleString()}</div></div>
+          <div class="rep-stat"><div class="sl">Avg Calls/Day</div><div class="sv">${avgCalls}</div></div>
+          <div class="rep-stat"><div class="sl">Total Talk</div><div class="sv">${fmtSec(totalTalk)}</div></div>
+          <div class="rep-stat"><div class="sl">Avg / Call</div><div class="sv">${fmtSec(avgTalkSec)}</div></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+// Auto-restore session if PIN is saved
+if (sessionStorage.getItem('ca') === '1' && PIN) {
+  // Verify PIN is still valid
+  fetch('/api/verify-pin', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ pin: PIN }),
+  }).then(r => {
+    if (r.ok) {
+      return r.json().then(d => {
+        dispOn = d.displayOn;
+        document.getElementById('pinGate').style.display   = 'none';
+        document.getElementById('dashboard').style.display = '';
+        init();
+      });
+    }
+  }).catch(() => {});
+} else {
+  setTimeout(() => document.getElementById('pinInput')?.focus(), 100);
+}
+
+// Theme icon init
+(function() {
+  const t = localStorage.getItem('costos-theme') || 'dark';
+  document.getElementById('sunIcon').style.display  = t === 'dark' ? '' : 'none';
+  document.getElementById('moonIcon').style.display = t === 'light' ? '' : 'none';
+})();
+
+// Auto-refresh every 60s
+setInterval(() => { if (document.getElementById('dashboard').style.display !== 'none') loadData(); }, 60_000);
+</script>
+</body>
+</html>
