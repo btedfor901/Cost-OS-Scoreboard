@@ -30,7 +30,11 @@ log = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-SCOPES    = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES    = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
 DIR       = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(DIR, "data.json")
 INTERVAL  = int(os.environ.get("INTERVAL_MINUTES", "15")) * 60  # seconds
@@ -40,6 +44,7 @@ ADMIN_PIN = os.environ.get("ADMIN_PIN", "costos2026")
 
 _display_on   = True
 _display_lock = threading.Lock()
+_creds        = None          # saved after auth so Sheets/Drive can reuse it
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
 
@@ -138,7 +143,50 @@ def auth_gmail():
                 "contents into the GMAIL_TOKEN Railway environment variable."
             )
 
+    global _creds
+    _creds = creds
     return build("gmail", "v1", credentials=creds)
+
+
+# ── Google Sheets – Sales Demos ───────────────────────────────────────────────
+
+def fetch_demos_sheet():
+    """Read 'Sales Demos' sheet and return {rep_name: count} dict."""
+    if not _creds:
+        log.warning("No creds available for Sheets API")
+        return {}
+    try:
+        drive_svc  = build("drive",  "v3", credentials=_creds)
+        sheets_svc = build("sheets", "v4", credentials=_creds)
+
+        res = drive_svc.files().list(
+            q="name='Sales Demos' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+            fields="files(id)",
+            pageSize=1,
+        ).execute()
+        files = res.get("files", [])
+        if not files:
+            log.warning("'Sales Demos' sheet not found in Drive")
+            return {}
+
+        sheet_id = files[0]["id"]
+        vals = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=sheet_id, range="A:B"
+        ).execute().get("values", [])
+
+        demos = {}
+        for row in vals[1:]:          # skip header row
+            if not row or not str(row[0]).strip():
+                continue
+            name  = str(row[0]).strip()
+            count = int(row[1]) if len(row) > 1 and str(row[1]).strip().isdigit() else 0
+            demos[name] = count
+
+        log.info("Sales Demos: %s", demos)
+        return demos
+    except Exception as e:
+        log.error("fetch_demos_sheet failed: %s", e)
+        return {}
 
 
 # ── Email / Nextiva logic (same as main.py) ───────────────────────────────────
@@ -374,6 +422,10 @@ def run_scrape():
                                   if wr["totalCalls"] else 0)
         wr["totalTalkTimeStr"] = fmt_dur(wr["totalTalkTimeSec"])
 
+    demos       = fetch_demos_sheet()
+    demos_total = sum(demos.values())
+    demos_reps  = [{"name": k, "demos": v} for k, v in demos.items()]
+
     dates = sorted(s["date"] for s in weekly_snaps) if weekly_snaps else []
     data  = {
         "scrapedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -383,6 +435,7 @@ def run_scrape():
                    "daysCount": len(weekly_snaps),
                    "dateRange": f"{dates[0]} to {dates[-1]}" if dates else ""},
         "history": history,
+        "demos":   {"total": demos_total, "reps": demos_reps},
     }
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)

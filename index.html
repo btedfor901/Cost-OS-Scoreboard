@@ -231,6 +231,17 @@
     .btn-sec { padding: 0.45rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--raised); color: var(--sub); font-family: inherit; font-size: 0.8rem; cursor: pointer; }
     .btn-pri { padding: 0.45rem 1rem; border-radius: 0.5rem; border: none; background: var(--brand); color: #fff; font-family: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer; }
 
+    /* ── Monthly Demos section ── */
+    .demos-card { background: var(--card); border: 1px solid var(--border); border-radius: 1rem; padding: 1.75rem; margin-top: 1.25rem; }
+    .demos-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .demos-title  { font-size: 1.1rem; font-weight: 600; }
+    .demos-total  { font-size: 0.85rem; color: var(--sub); background: var(--raised); padding: 0.25rem 0.75rem; border-radius: 9999px; }
+    .demos-grid   { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; }
+    .demo-rep     { background: var(--raised); border-radius: 0.75rem; padding: 1.25rem 1.5rem; text-align: center; }
+    .demo-rep-name  { font-size: 0.875rem; color: var(--sub); margin-bottom: 0.5rem; }
+    .demo-rep-count { font-size: 2.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--brand); line-height: 1; }
+    .demo-rep-label { font-size: 0.72rem; color: var(--dim); margin-top: 0.3rem; }
+
     /* ── Rep Stats Modal ── */
     .rep-modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,.72);
@@ -527,7 +538,7 @@ function render() {
       <div class="stat-card"><div class="stat-label">Team Total Calls</div><div class="stat-value">${totalCalls.toLocaleString()}</div></div>
       <div class="stat-card"><div class="stat-label">Team Talk Time</div><div class="stat-value">${fmtSec(totalTalk)}</div></div>
       <div class="stat-card"><div class="stat-label">Team Avg Talk Time</div><div class="stat-value">${fmtSec(avgTalk)}</div></div>
-      <div class="stat-card"><div class="stat-label">Monthly Demos</div><div class="stat-value">—</div></div>
+      <div class="stat-card"><div class="stat-label">Monthly Demos</div><div class="stat-value">${DATA.demos ? DATA.demos.total : '—'}</div></div>
       <div class="stat-card"><div class="stat-label">Active Reps</div><div class="stat-value">${activeReps}</div></div>
     </div>
 
@@ -567,7 +578,23 @@ function render() {
           </div>`;
         }).join('')}
       </div>
-    </div>`;
+    </div>
+
+    ${DATA.demos && DATA.demos.reps && DATA.demos.reps.length ? `
+    <div class="demos-card">
+      <div class="demos-header">
+        <span class="demos-title">Monthly Demos</span>
+        <span class="demos-total">Team total: ${DATA.demos.total}</span>
+      </div>
+      <div class="demos-grid">
+        ${DATA.demos.reps.map(r => `
+          <div class="demo-rep">
+            <div class="demo-rep-name">${r.name}</div>
+            <div class="demo-rep-count">${r.demos}</div>
+            <div class="demo-rep-label">demos this month</div>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}`;
 }
 
 function setAvg(mode) { avgMode = mode; if (DATA) render(); }

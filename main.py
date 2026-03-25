@@ -25,7 +25,11 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SCOPES       = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES       = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
 DATA_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
 INTERVAL     = 15 * 60  # seconds between daemon runs
 NEXTIVA_API  = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
@@ -54,7 +58,7 @@ def auth_gmail():
         with open(token_path, "w") as f:
             f.write(creds.to_json())
 
-    return build("gmail", "v1", credentials=creds)
+    return build("gmail", "v1", credentials=creds), creds
 
 
 # ── Email helpers ─────────────────────────────────────────────────────────────
@@ -296,9 +300,48 @@ def fmt_dur(secs):
     return f"{s}s"
 
 
+# ── Google Sheets – Sales Demos ───────────────────────────────────────────────
+
+def fetch_demos_sheet(creds):
+    """Read 'Sales Demos' sheet and return {rep_name: count} dict."""
+    try:
+        from googleapiclient.discovery import build as _build
+        drive_svc  = _build("drive",  "v3", credentials=creds)
+        sheets_svc = _build("sheets", "v4", credentials=creds)
+
+        res = drive_svc.files().list(
+            q="name='Sales Demos' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+            fields="files(id)",
+            pageSize=1,
+        ).execute()
+        files = res.get("files", [])
+        if not files:
+            print("  'Sales Demos' sheet not found in Drive")
+            return {}
+
+        sheet_id = files[0]["id"]
+        vals = sheets_svc.spreadsheets().values().get(
+            spreadsheetId=sheet_id, range="A:B"
+        ).execute().get("values", [])
+
+        demos = {}
+        for row in vals[1:]:
+            if not row or not str(row[0]).strip():
+                continue
+            name  = str(row[0]).strip()
+            count = int(row[1]) if len(row) > 1 and str(row[1]).strip().isdigit() else 0
+            demos[name] = count
+
+        print(f"  Sales Demos: {demos}")
+        return demos
+    except Exception as e:
+        print(f"  fetch_demos_sheet failed: {e}")
+        return {}
+
+
 # ── Save data ─────────────────────────────────────────────────────────────────
 
-def save(all_dates, report_id):
+def save(all_dates, report_id, demos=None):
     """
     all_dates: {date_str: [rep_dicts]} — all dates returned by the API.
     Merges with existing history so no previously-saved days are lost.
@@ -338,6 +381,10 @@ def save(all_dates, report_id):
                                   if wr["totalCalls"] else 0)
         wr["totalTalkTimeStr"] = fmt_dur(wr["totalTalkTimeSec"])
 
+    demos       = demos or {}
+    demos_total = sum(demos.values())
+    demos_reps  = [{"name": k, "demos": v} for k, v in demos.items()]
+
     dates = sorted(s["date"] for s in weekly_snaps)
     data  = {
         "scrapedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -349,6 +396,7 @@ def save(all_dates, report_id):
             "dateRange": f"{dates[0]} to {dates[-1]}" if dates else "",
         },
         "history": history,
+        "demos":   {"total": demos_total, "reps": demos_reps},
     }
 
     with open(DATA_FILE, "w") as f:
@@ -359,12 +407,13 @@ def save(all_dates, report_id):
 
 # ── Core scrape pass ──────────────────────────────────────────────────────────
 
-def run_scrape(svc):
+def run_scrape(svc, creds):
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Starting scrape…")
     report_id = get_report_id_from_gmail(svc)
     all_dates = fetch_nextiva_data(report_id)
+    demos     = fetch_demos_sheet(creds)
     if all_dates:
-        save(all_dates, report_id)
+        save(all_dates, report_id, demos)
     else:
         print("  No data extracted")
 
@@ -379,19 +428,19 @@ def main():
         print(f"  Daemon mode — every {INTERVAL // 60} minutes")
     print("=" * 50)
     print("\nConnecting to Gmail…")
-    svc = auth_gmail()
+    svc, creds = auth_gmail()
     print("✓ Authenticated")
 
     if daemon:
         while True:
             try:
-                run_scrape(svc)
+                run_scrape(svc, creds)
             except Exception as e:
                 print(f"  ERROR: {e}")
             print(f"\nSleeping {INTERVAL // 60} min…")
             time.sleep(INTERVAL)
     else:
-        run_scrape(svc)
+        run_scrape(svc, creds)
 
 
 if __name__ == "__main__":
