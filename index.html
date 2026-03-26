@@ -390,6 +390,32 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+// ── Current streak (consecutive most-recent days at #1) ───────────────────────
+function calcStreaks(history) {
+  const sorted = [...(history || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const repNames = new Set();
+  for (const snap of sorted) for (const r of (snap.reps || [])) repNames.add(r.name);
+  const streaks = {};
+  for (const name of repNames) {
+    let calls = 0, talk = 0, callsDone = false, talkDone = false;
+    for (const snap of sorted) {
+      const active = (snap.reps || []).filter(r => r.totalCalls > 0);
+      if (active.length < 2) continue;
+      if (!callsDone) {
+        const w = active.reduce((b, r) => r.totalCalls > b.totalCalls ? r : b);
+        if (w.name === name) calls++; else callsDone = true;
+      }
+      if (!talkDone) {
+        const w = active.reduce((b, r) => r.totalTalkTimeSec > b.totalTalkTimeSec ? r : b);
+        if (w.name === name) talk++; else talkDone = true;
+      }
+      if (callsDone && talkDone) break;
+    }
+    streaks[name] = { calls, talk };
+  }
+  return streaks;
+}
+
 // ── Day-win counter ───────────────────────────────────────────────────────────
 function calcDayWins(history, start, end) {
   const wins = {};
@@ -445,6 +471,7 @@ function render() {
   const maxCall = byCall[0]?.totalCalls || 1;
   const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
   const dayWins = calcDayWins(DATA.history, start, end);
+  const streaks = calcStreaks(DATA.history);
 
   // Store for modal access
   REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
@@ -460,7 +487,7 @@ function render() {
     const safeName = r.name.replace(/'/g, "\\'");
     const rowCls   = rank === 1 ? 'rep-row rank-1' : 'rep-row';
     const winLabel = winDays >= 2
-      ? `<div class="win-streak">🏆 ${isTime ? 'Talk time' : 'Calls'} leader — ${winDays} days</div>`
+      ? `<div class="win-streak">${activeTab === 'today' ? '🔥' : '🏆'} ${isTime ? 'Talk time' : 'Calls'} ${activeTab === 'today' ? `${winDays}-day streak` : `leader — ${winDays} days`}</div>`
       : '';
     return `<div class="${rowCls}" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
@@ -526,14 +553,14 @@ function render() {
           <span class="lb-title">Total Calls</span>
           <span class="lb-badge">${byCall.length} reps</span>
         </div>
-        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, dayWins[r.name]?.calls || 0)).join('')}
+        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0))).join('')}
       </div>
       <div class="lb-card">
         <div class="lb-header">
           <span class="lb-title">Total Talk Time</span>
           <span class="lb-badge">${byTalk.length} reps</span>
         </div>
-        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, dayWins[r.name]?.talk || 0)).join('')}
+        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0))).join('')}
       </div>
     </div>
 
