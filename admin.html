@@ -315,6 +315,7 @@
           <div class="value" id="sDays">—</div>
         </div>
       </div>
+      <div id="errorBanner" style="display:none;margin-top:0.75rem;padding:0.75rem 1rem;background:#2d1515;border:1px solid #7f1d1d;border-radius:0.5rem;font-size:0.8rem;color:#fca5a5;"></div>
     </div>
 
     <!-- Force Refresh -->
@@ -466,18 +467,38 @@ function fmtTs(iso) {
   return d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
 }
 
-function updateStatus() {
+async function updateStatus() {
   if (!DATA) return;
-  document.getElementById('sHealth').textContent = '✓ Online';
-  document.getElementById('sLast').textContent   = fmtTs(DATA.scrapedAt);
-  // Next scrape = last scrape + 15 min
+  document.getElementById('sLast').textContent = fmtTs(DATA.scrapedAt);
   if (DATA.scrapedAt) {
     const next = new Date(new Date(DATA.scrapedAt).getTime() + 15 * 60 * 1000);
     document.getElementById('sNext').textContent = next.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
   }
   document.getElementById('sReps').textContent = (DATA.today?.reps?.length || 0);
   document.getElementById('sDays').textContent = (DATA.history?.length || 0);
+
+  // Pull live health from server
+  try {
+    const hr = await fetch('/health');
+    if (!hr.ok) return;
+    const h = await hr.json();
+    const healthy = h.consecutive_failures === 0;
+    const sEl = document.getElementById('sHealth');
+    const banner = document.getElementById('errorBanner');
+    if (healthy) {
+      sEl.textContent = '✓ Online';
+      sEl.style.color = '#10b981';
+      banner.style.display = 'none';
+    } else {
+      sEl.textContent = `⚠ ${h.consecutive_failures} failure${h.consecutive_failures > 1 ? 's' : ''}`;
+      sEl.style.color = '#ef4444';
+      banner.style.display = '';
+      banner.textContent = `Last error: ${h.last_error || 'unknown'}`;
+    }
+  } catch(_) {}
 }
+
+setInterval(updateStatus, 30_000);
 
 // ── Force scrape ──────────────────────────────────────────────────────────────
 async function doScrape() {

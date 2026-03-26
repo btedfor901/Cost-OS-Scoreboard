@@ -46,6 +46,25 @@ _display_on   = True
 _display_lock = threading.Lock()
 _creds        = None          # saved after auth so Sheets/Drive can reuse it
 
+# ── Scraper health tracking ───────────────────────────────────────────────────
+
+ALERT_AFTER_FAILURES = 3   # email alert after this many consecutive failures
+ALERT_EMAIL          = os.environ.get("ALERT_EMAIL", "treyt@cost-os.com")
+
+_health_lock = threading.Lock()
+_health = {
+    "last_success":          None,
+    "last_attempt":          None,
+    "last_error":            None,
+    "consecutive_failures":  0,
+    "total_runs":            0,
+    "total_failures":        0,
+    "scheduler_alive":       False,
+    "start_time":            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+}
+
+_scheduler_thread = None
+
 # ── Flask app ─────────────────────────────────────────────────────────────────
 
 app = Flask(__name__, static_folder=DIR)
@@ -75,7 +94,11 @@ def admin():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    with _health_lock:
+        h = dict(_health)
+    h["scheduler_alive"] = bool(_scheduler_thread and _scheduler_thread.is_alive())
+    h["status"] = "degraded" if h["consecutive_failures"] >= ALERT_AFTER_FAILURES else "ok"
+    return jsonify(h)
 
 
 @app.route("/api/display-status")
@@ -392,18 +415,45 @@ def get_report_id_from_gmail(svc):
     return FALLBACK_ID
 
 
+def _send_alert_email(subject, body):
+    """Send an alert email using the existing Gmail credentials."""
+    if not _creds:
+        return
+    try:
+        import base64 as b64
+        from email.mime.text import MIMEText
+        svc = build("gmail", "v1", credentials=_creds)
+        profile = svc.users().getProfile(userId="me").execute()
+        to_addr = ALERT_EMAIL or profile["emailAddress"]
+        msg = MIMEText(body)
+        msg["to"]      = to_addr
+        msg["from"]    = profile["emailAddress"]
+        msg["subject"] = subject
+        raw = b64.urlsafe_b64encode(msg.as_bytes()).decode()
+        svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+        log.info("Alert email sent to %s", to_addr)
+    except Exception as e:
+        log.warning("Alert email failed: %s", e)
+
+
 def run_scrape():
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _health_lock:
+        _health["last_attempt"] = now_str
+        _health["total_runs"]  += 1
     log.info("Starting scrape pass…")
     try:
         svc = auth_gmail()
     except Exception as e:
         log.error("Gmail auth failed: %s", e)
+        _record_failure(f"Gmail auth failed: {e}")
         return
 
     report_id = get_report_id_from_gmail(svc)
     all_dates = fetch_nextiva_data(report_id)
     if not all_dates:
         log.warning("No data extracted")
+        _record_failure("Nextiva API returned no data")
         return
 
     today_str  = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -472,17 +522,69 @@ def run_scrape():
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
     log.info("Saved %d days of history (%d reps today)", len(history), len(today_reps))
+    _record_success()
+
+
+# ── Health helpers ────────────────────────────────────────────────────────────
+
+def _record_success():
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _health_lock:
+        _health["last_success"]         = now_str
+        _health["last_error"]           = None
+        _health["consecutive_failures"] = 0
+        _health["total_runs"]          += 0  # already incremented
+
+
+def _record_failure(msg):
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _health_lock:
+        _health["last_error"]            = f"[{now_str}] {msg}"
+        _health["consecutive_failures"] += 1
+        _health["total_failures"]       += 1
+        failures = _health["consecutive_failures"]
+    log.error("Scrape failure #%d: %s", failures, msg)
+    if failures == ALERT_AFTER_FAILURES:
+        _send_alert_email(
+            f"⚠️ Cost-OS Scraper: {failures} consecutive failures",
+            f"The Cost-OS scraper has failed {failures} times in a row.\n\n"
+            f"Last error: {msg}\n\n"
+            f"Check the admin panel at /admin for details.",
+        )
 
 
 # ── Background scheduler ──────────────────────────────────────────────────────
 
 def scheduler_loop():
-    # Initial scrape on startup
     run_scrape()
     while True:
-        log.info("Sleeping %d min until next scrape…", INTERVAL // 60)
-        time.sleep(INTERVAL)
+        with _health_lock:
+            failures = _health["consecutive_failures"]
+        # Retry sooner after a failure (5 min), otherwise use normal interval
+        wait = 5 * 60 if failures > 0 else INTERVAL
+        log.info("Sleeping %d min until next scrape…", wait // 60)
+        time.sleep(wait)
         run_scrape()
+
+
+def start_scheduler():
+    global _scheduler_thread
+    _scheduler_thread = threading.Thread(target=scheduler_loop, daemon=True, name="scheduler")
+    _scheduler_thread.start()
+    log.info("Scheduler thread started (pid-like id: %s)", _scheduler_thread.ident)
+
+
+def watchdog_loop():
+    """Checks every 60 s that the scheduler thread is alive; restarts if not."""
+    while True:
+        time.sleep(60)
+        if not _scheduler_thread or not _scheduler_thread.is_alive():
+            log.error("⚠️  Scheduler thread died — restarting now")
+            _record_failure("Scheduler thread died unexpectedly")
+            start_scheduler()
+        else:
+            with _health_lock:
+                _health["scheduler_alive"] = True
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -490,10 +592,8 @@ def scheduler_loop():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
 
-    # Start background scraper thread
-    t = threading.Thread(target=scheduler_loop, daemon=True)
-    t.start()
+    start_scheduler()
+    threading.Thread(target=watchdog_loop, daemon=True, name="watchdog").start()
 
-    # Start Flask
     log.info("Server starting on port %d", port)
     app.run(host="0.0.0.0", port=port)
