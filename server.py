@@ -7,7 +7,7 @@ Environment variables (set in Railway):
   GMAIL_TOKEN        – contents of token.json (JSON string)
   GMAIL_CREDENTIALS  – contents of credentials.json (JSON string)
   PORT               – automatically set by Railway
-  INTERVAL_MINUTES   – scrape interval (default: 15)
+  (scraper runs every 5 min 7 AM–7 PM CST, hourly outside those hours)
 """
 
 import os
@@ -18,6 +18,7 @@ import threading
 import time
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import requests
 from flask import Flask, send_file, jsonify, abort, request as flask_request
@@ -37,7 +38,8 @@ SCOPES    = [
 ]
 DIR       = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(DIR, "data.json")
-INTERVAL  = int(os.environ.get("INTERVAL_MINUTES", "15")) * 60  # seconds
+INTERVAL_ACTIVE = 5 * 60    # 5 min  — 7 AM–7 PM CST
+INTERVAL_OFF    = 60 * 60   # 1 hour — outside business hours
 ADMIN_PIN = os.environ.get("ADMIN_PIN", "costos2026")
 
 # ── Display toggle state ──────────────────────────────────────────────────────
@@ -555,13 +557,22 @@ def _record_failure(msg):
 
 # ── Background scheduler ──────────────────────────────────────────────────────
 
+_CST = ZoneInfo("America/Chicago")
+
+def _scrape_interval() -> int:
+    """Return the appropriate wait time based on CST time-of-day."""
+    hour = datetime.now(_CST).hour  # 0–23
+    if 7 <= hour < 19:  # 7 AM – 7 PM CST
+        return INTERVAL_ACTIVE
+    return INTERVAL_OFF
+
 def scheduler_loop():
     run_scrape()
     while True:
         with _health_lock:
             failures = _health["consecutive_failures"]
-        # Retry sooner after a failure (5 min), otherwise use normal interval
-        wait = 5 * 60 if failures > 0 else INTERVAL
+        # On failure retry in 5 min regardless of time-of-day
+        wait = 5 * 60 if failures > 0 else _scrape_interval()
         log.info("Sleeping %d min until next scrape…", wait // 60)
         time.sleep(wait)
         run_scrape()
