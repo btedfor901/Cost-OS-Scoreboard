@@ -317,7 +317,7 @@
     </nav>
 
     <div class="header-actions">
-      <a href="/admin" class="admin-link">Admin</a>
+      <a href="/admin" class="admin-link" id="adminLink">Admin</a>
       <button class="theme-btn" onclick="toggleTheme()">☀</button>
     </div>
   </div>
@@ -333,6 +333,11 @@
 
 
 <script>
+// ── Admin visibility (only on /manage) ───────────────────────────────────────
+if (window.location.pathname !== '/manage') {
+  document.getElementById('adminLink').style.display = 'none';
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let DATA       = null;
 let REPS_DATA  = null;

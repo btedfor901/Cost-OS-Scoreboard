@@ -63,6 +63,11 @@ def data():
     return send_file(DATA_FILE, mimetype="application/json")
 
 
+@app.route("/manage")
+def manage():
+    return send_file(os.path.join(DIR, "index.html"))
+
+
 @app.route("/admin")
 def admin():
     return send_file(os.path.join(DIR, "admin.html"))
