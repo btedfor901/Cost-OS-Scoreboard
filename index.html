@@ -218,6 +218,18 @@
     .rmb-track{height:.375rem;background:var(--border);border-radius:9999px;overflow:hidden}
     .rmb-fill{height:100%;border-radius:9999px;background:var(--grad);width:0;transition:width .6s cubic-bezier(.4,0,.2,1) .1s}
 
+    /* ── Insight / quality / pace badges ── */
+    .insight-text{font-size:.65rem;font-weight:500;margin-top:.15rem;color:var(--dim)}
+    .insight-text.good{color:#10b981}
+    .insight-text.warn{color:#FBBF24}
+    .insight-text.alert{color:#ef4444}
+    .quality-pill{font-size:.65rem;font-weight:600;color:var(--sub);background:var(--card);border:1px solid var(--border);border-radius:.375rem;padding:.1rem .45rem;white-space:nowrap;flex-shrink:0;align-self:center}
+    .perf-pill{font-size:.65rem;font-weight:700;background:rgba(59,130,246,.12);color:var(--brand);border:1px solid rgba(59,130,246,.2);border-radius:.375rem;padding:.1rem .45rem;white-space:nowrap;flex-shrink:0;align-self:center}
+    .pace-wrap{margin-top:.3rem}
+    .pace-label{display:flex;justify-content:space-between;font-size:.6rem;color:var(--dim);margin-bottom:.2rem}
+    .pace-track{height:.2rem;background:var(--card);border-radius:9999px;overflow:hidden}
+    .pace-fill{height:100%;border-radius:9999px;width:0;transition:width .9s cubic-bezier(.4,0,.2,1) .15s}
+
     /* ── States ── */
     .unavailable{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh;gap:.875rem;color:var(--dim);text-align:center;padding:2rem}
     .unavailable h2{font-size:1.125rem;font-weight:500;color:var(--sub)}
@@ -389,6 +401,33 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+// ── Talk-time metrics helpers ─────────────────────────────────────────────────
+const DAILY_GOAL_SEC = 9600; // 160 minutes
+
+function coachingInsight(rep, allReps) {
+  if (!rep.totalCalls) return { text: 'No calls yet', cls: '' };
+  const active      = allReps.filter(r => r.totalCalls > 0);
+  const teamAvgSec  = active.reduce((s, r) => s + r.avgTalkTimeSec, 0) / Math.max(active.length, 1);
+  const avgSec      = rep.avgTalkTimeSec;
+  if (avgSec > teamAvgSec * 1.25)  return { text: '↑ High conversation quality', cls: 'good' };
+  if (avgSec < teamAvgSec * 0.75)  return { text: '↓ Low connection rate',       cls: 'alert' };
+  const teamAvgCall = active.reduce((s, r) => s + r.totalCalls, 0) / Math.max(active.length, 1);
+  if (rep.totalCalls > teamAvgCall * 1.2) return { text: '↑ Strong call volume',  cls: 'good' };
+  if (rep.totalTalkTimeSec >= DAILY_GOAL_SEC * 0.9) return { text: '✓ On pace for goal', cls: 'good' };
+  return { text: 'Consistent performer', cls: '' };
+}
+
+function calcPerfScore(rep, allReps, demosMap) {
+  const maxTalk  = Math.max(...allReps.map(r => r.totalTalkTimeSec), 1);
+  const maxCalls = Math.max(...allReps.map(r => r.totalCalls), 1);
+  const maxDemos = Math.max(...allReps.map(r => demosMap[r.name] || 0), 1);
+  return Math.round(
+    (rep.totalTalkTimeSec / maxTalk)         * 60 +
+    (rep.totalCalls       / maxCalls)         * 10 +
+    ((demosMap[rep.name] || 0) / maxDemos)    * 30
+  );
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   const el = document.getElementById('main');
@@ -427,28 +466,57 @@ function render() {
   const maxCall = byCall[0]?.totalCalls || 1;
   const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
 
+  // Build demos lookup + performance scores
+  const demosMap = {};
+  (DATA.demos?.reps || []).forEach(d => { demosMap[d.name] = d.demos; });
+  const perfScores = {};
+  reps.forEach(r => { perfScores[r.name] = calcPerfScore(r, reps, demosMap); });
+
   // Store for modal access
   REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
 
-  // Rank-based blue palette: #1 = brand blue, stepping darker
-  const rankColors = ['#0c7dc6','#0a69a8','#08558a','#06416b','#053459','#04294a'];
+  const rankColors = ['#1d4ed8','#1e40af','#1e3a8a','#0c4a6e','#0a3a5f','#08294a'];
 
-  function repRow(r, rank, value, maxVal, isTime) {
-    const pct     = Math.round((value / maxVal) * 100);
-    const color   = rankColors[Math.min(rank - 1, rankColors.length - 1)];
-    const disp    = isTime ? fmtSec(value) : value.toLocaleString();
-    const rankCls = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
+  function repRow(r, rank, value, maxVal, isTime, opts = {}) {
+    const pct      = Math.round((value / maxVal) * 100);
+    const color    = rankColors[Math.min(rank - 1, rankColors.length - 1)];
+    const disp     = isTime ? fmtSec(value) : value.toLocaleString();
+    const rankCls  = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
     const safeName = r.name.replace(/'/g, "\\'");
     const rowCls   = rank === 1 ? 'rep-row rank-1' : 'rep-row';
+
+    // Coaching insight
+    const ins = opts.insight ? coachingInsight(r, reps) : null;
+
+    // Pace to goal (today tab only)
+    let paceHtml = '';
+    if (opts.pace && activeTab === 'today') {
+      const pacePct   = Math.min(Math.round(r.totalTalkTimeSec / DAILY_GOAL_SEC * 100), 100);
+      const paceColor = pacePct >= 80 ? '#10b981' : pacePct >= 50 ? '#FBBF24' : '#ef4444';
+      paceHtml = `<div class="pace-wrap">
+        <div class="pace-label"><span>Pace to 160 min goal</span><span style="color:${paceColor};font-weight:600">${pacePct}%</span></div>
+        <div class="pace-track"><div class="pace-fill" data-pct="${pacePct}" style="background:${paceColor};width:0"></div></div>
+      </div>`;
+    }
+
+    // Side badges
+    const qualBadge = (opts.quality && r.totalCalls)
+      ? `<div class="quality-pill">${fmtSec(r.avgTalkTimeSec)}/call</div>` : '';
+    const perfBadge = opts.perf
+      ? `<div class="perf-pill">${perfScores[r.name]}pts</div>` : '';
+
     return `<div class="${rowCls}" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
       <div class="rep-mid">
         <div class="rep-name">${r.name}</div>
-        <div class="rep-bar-track">
+        ${ins ? `<div class="insight-text ${ins.cls}">${ins.text}</div>` : ''}
+        ${paceHtml}
+        <div class="rep-bar-track" style="${paceHtml ? 'margin-top:.3rem' : ''}">
           <div class="rep-bar-fill" data-pct="${pct}" style="width:0"></div>
         </div>
       </div>
+      ${qualBadge}${perfBadge}
       <div class="rep-val accent">${disp}</div>
     </div>`;
   }
@@ -491,8 +559,8 @@ function render() {
 
     <div class="stats-row">
       <div class="stat-card"><div class="stat-label">Team Total Calls</div><div class="stat-value" data-num="${totalCalls}">${totalCalls.toLocaleString()}</div></div>
-      <div class="stat-card"><div class="stat-label">Team Talk Time</div><div class="stat-value">${fmtSec(totalTalk)}</div></div>
-      <div class="stat-card"><div class="stat-label">Team Avg Talk Time</div><div class="stat-value">${fmtSec(avgTalk)}</div></div>
+      <div class="stat-card"><div class="stat-label">Conversation Time</div><div class="stat-value">${fmtSec(totalTalk)}</div></div>
+      <div class="stat-card"><div class="stat-label">Call Quality</div><div class="stat-value">${fmtSec(avgTalk)}</div></div>
       <div class="stat-card"><div class="stat-label">Monthly Demos</div><div class="stat-value" ${DATA.demos ? `data-num="${DATA.demos.total}"` : ''}>${DATA.demos ? DATA.demos.total : '—'}</div></div>
       <div class="stat-card"><div class="stat-label">Active Reps</div><div class="stat-value" data-num="${activeReps}">${activeReps}</div></div>
     </div>
@@ -500,17 +568,17 @@ function render() {
     <div class="lb-grid">
       <div class="lb-card">
         <div class="lb-header">
-          <span class="lb-title">Total Calls</span>
-          <span class="lb-badge">${byCall.length} reps</span>
+          <span class="lb-title">Conversation Time</span>
+          <span class="lb-badge">${byTalk.length} reps</span>
         </div>
-        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false)).join('')}
+        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, {insight:true, pace:true, quality:true})).join('')}
       </div>
       <div class="lb-card">
         <div class="lb-header">
-          <span class="lb-title">Total Talk Time</span>
-          <span class="lb-badge">${byTalk.length} reps</span>
+          <span class="lb-title">Total Calls</span>
+          <span class="lb-badge">${byCall.length} reps</span>
         </div>
-        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true)).join('')}
+        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, {insight:true, perf:true})).join('')}
       </div>
     </div>
 
@@ -558,6 +626,7 @@ function render() {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     el.querySelectorAll('.rep-bar-fill[data-pct]').forEach(b => { b.style.width = b.dataset.pct + '%'; });
     el.querySelectorAll('.rmb-fill[data-pct]').forEach(b => { b.style.width = b.dataset.pct + '%'; });
+    el.querySelectorAll('.pace-fill[data-pct]').forEach(b => { b.style.width = b.dataset.pct + '%'; });
   }));
 
   // Count-up for numeric stat values
