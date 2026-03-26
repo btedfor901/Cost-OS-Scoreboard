@@ -333,12 +333,12 @@
       <div class="card-title"><span class="icon">🔗</span> Access Links</div>
       <p class="desc">Share the scoreboard link with your team. Keep the admin link private.</p>
       <div class="link-row">
-        <span class="link-label">Scoreboard (team)</span>
+        <span class="link-label">Salesman Link</span>
         <span class="link-url" id="scoreboardUrl">—</span>
         <button class="copy-btn" onclick="copyLink('scoreboardUrl')">Copy</button>
       </div>
       <div class="link-row">
-        <span class="link-label">Admin (private)</span>
+        <span class="link-label">Admin Link</span>
         <span class="link-url" id="adminUrl">—</span>
         <button class="copy-btn" onclick="copyLink('adminUrl')">Copy</button>
       </div>
@@ -430,7 +430,7 @@ function toggleTheme() {
 async function init() {
   const base = window.location.origin;
   document.getElementById('scoreboardUrl').textContent = base + '/';
-  document.getElementById('adminUrl').textContent      = base + '/admin';
+  document.getElementById('adminUrl').textContent      = base + '/manage';
 
   await loadData();
   updateDisplayToggle();
