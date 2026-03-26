@@ -270,6 +270,7 @@ def parse_response(data):
     results_list = data["results"]
     user_emails  = data.get("filters", {}).get("users", [])
     date_map     = {}  # {date: {name: (calls, talk_sec)}}
+    all_rep_names = []  # every rep seen in the API response, in order
 
     for i, series in enumerate(results_list):
         if not isinstance(series, dict):
@@ -284,6 +285,9 @@ def parse_response(data):
             name = user_emails[i].split("@")[0]
         if not name:
             name = f"Rep {i+1}"
+
+        if name not in all_rep_names:
+            all_rep_names.append(name)
 
         for row in series.get("data", series.get("rows", [])):
             if not isinstance(row, dict):
@@ -310,15 +314,23 @@ def parse_response(data):
                 date_map[date] = {}
             date_map[date][name] = (calls, talk_sec)
 
+    # Always include every known rep for today, even with 0 calls
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if all_rep_names:
+        if today_str not in date_map:
+            date_map[today_str] = {}
+        for name in all_rep_names:
+            if name not in date_map[today_str]:
+                date_map[today_str][name] = (0, 0)
+
     if not date_map:
-        log.warning("No date rows with calls > 0 found")
+        log.warning("No rep data found in response")
         return {}
 
     result = {
         date: [make_rep(n, c, t) for n, (c, t) in reps.items()]
         for date, reps in date_map.items()
     }
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     log.info("Parsed %d dates (%d reps today)", len(result), len(result.get(today_str, [])))
     return result
 
