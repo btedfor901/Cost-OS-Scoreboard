@@ -94,6 +94,11 @@ def admin():
     return send_file(os.path.join(DIR, "admin.html"))
 
 
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    return send_file(os.path.join(DIR, "static", filename))
+
+
 @app.route("/health")
 def health():
     with _health_lock:
