@@ -138,6 +138,7 @@
     .rep-row.rank-1 .rep-name{font-weight:600}
     .rep-bar-track{height:.25rem;background:var(--card);border-radius:9999px;overflow:hidden}
     .rep-bar-fill{height:100%;border-radius:9999px;background:var(--grad);width:0;transition:width .9s cubic-bezier(.4,0,.2,1)}
+    .win-streak{font-size:.62rem;font-weight:600;color:#FBBF24;margin-top:.2rem;letter-spacing:.01em}
     .rep-row.rank-1 .rep-bar-fill{background:linear-gradient(90deg,#FBBF24,#F59E0B)}
 
     .rep-val{font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;text-align:right;min-width:4rem}
@@ -389,6 +390,23 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+// ── Day-win counter ───────────────────────────────────────────────────────────
+function calcDayWins(history, start, end) {
+  const wins = {};
+  for (const snap of (history || [])) {
+    if (snap.date < start || snap.date > end) continue;
+    const active = (snap.reps || []).filter(r => r.totalCalls > 0);
+    if (active.length < 2) continue; // skip days with only 1 rep active
+    const callWinner = active.reduce((b, r) => r.totalCalls > b.totalCalls ? r : b);
+    const talkWinner = active.reduce((b, r) => r.totalTalkTimeSec > b.totalTalkTimeSec ? r : b);
+    if (!wins[callWinner.name]) wins[callWinner.name] = { calls: 0, talk: 0 };
+    wins[callWinner.name].calls++;
+    if (!wins[talkWinner.name]) wins[talkWinner.name] = { calls: 0, talk: 0 };
+    wins[talkWinner.name].talk++;
+  }
+  return wins;
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   const el = document.getElementById('main');
@@ -426,6 +444,7 @@ function render() {
   const byTalk = [...reps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
   const maxCall = byCall[0]?.totalCalls || 1;
   const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
+  const dayWins = calcDayWins(DATA.history, start, end);
 
   // Store for modal access
   REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
@@ -433,13 +452,16 @@ function render() {
   // Rank-based blue palette: #1 = brand blue, stepping darker
   const rankColors = ['#0c7dc6','#0a69a8','#08558a','#06416b','#053459','#04294a'];
 
-  function repRow(r, rank, value, maxVal, isTime) {
+  function repRow(r, rank, value, maxVal, isTime, winDays = 0) {
     const pct     = Math.round((value / maxVal) * 100);
     const color   = rankColors[Math.min(rank - 1, rankColors.length - 1)];
     const disp    = isTime ? fmtSec(value) : value.toLocaleString();
     const rankCls = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
     const safeName = r.name.replace(/'/g, "\\'");
     const rowCls   = rank === 1 ? 'rep-row rank-1' : 'rep-row';
+    const winLabel = winDays >= 2
+      ? `<div class="win-streak">🏆 ${isTime ? 'Talk time' : 'Calls'} leader — ${winDays} days</div>`
+      : '';
     return `<div class="${rowCls}" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
@@ -448,6 +470,7 @@ function render() {
         <div class="rep-bar-track">
           <div class="rep-bar-fill" data-pct="${pct}" style="width:0"></div>
         </div>
+        ${winLabel}
       </div>
       <div class="rep-val accent">${disp}</div>
     </div>`;
@@ -503,14 +526,14 @@ function render() {
           <span class="lb-title">Total Calls</span>
           <span class="lb-badge">${byCall.length} reps</span>
         </div>
-        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false)).join('')}
+        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, dayWins[r.name]?.calls || 0)).join('')}
       </div>
       <div class="lb-card">
         <div class="lb-header">
           <span class="lb-title">Total Talk Time</span>
           <span class="lb-badge">${byTalk.length} reps</span>
         </div>
-        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true)).join('')}
+        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, dayWins[r.name]?.talk || 0)).join('')}
       </div>
     </div>
 
