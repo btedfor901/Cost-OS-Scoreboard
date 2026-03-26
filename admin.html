@@ -579,7 +579,9 @@ function renderChart() {
     const dateSel = document.getElementById('intradayDateSel');
     const histDates = (DATA?.history || []).map(s => s.date).sort().reverse().slice(0, 7);
     dateSel.innerHTML = histDates.map(d => {
-      const label = d === today ? `${d} (Today)` : d;
+      const dt = new Date(d + 'T12:00:00');
+      const fmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const label = d === today ? `${fmt} (Today)` : fmt;
       return `<option value="${d}" ${(intradayDate || today) === d ? 'selected' : ''}>${label}</option>`;
     }).join('');
     if (!intradayDate) intradayDate = today;
@@ -668,7 +670,7 @@ function renderChart() {
 function buildLegend(repNames) {
   document.getElementById('chartLegend').innerHTML = repNames.map(n => `
     <div class="leg-item">
-      <div class="leg-dot" style="background:${repColor(n, repNames)}"></div>${n}
+      <div class="leg-dot" style="background:${repColor(n, repNames)}"></div>${n.split(' ')[0]}
     </div>`).join('');
 }
 
