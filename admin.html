@@ -472,7 +472,12 @@ async function updateStatus() {
   if (!DATA) return;
   document.getElementById('sLast').textContent = fmtTs(DATA.scrapedAt);
   if (DATA.scrapedAt) {
-    const next = new Date(new Date(DATA.scrapedAt).getTime() + 15 * 60 * 1000);
+    // Match server logic: 5 min during Mon–Fri 8 AM–5 PM CST, else 60 min
+    const nowCST = new Date(new Date().toLocaleString('en-US', {timeZone: 'America/Chicago'}));
+    const dow = nowCST.getDay(); // 0=Sun,6=Sat
+    const hour = nowCST.getHours();
+    const intervalMs = (dow >= 1 && dow <= 5 && hour >= 8 && hour < 17) ? 5 * 60 * 1000 : 60 * 60 * 1000;
+    const next = new Date(new Date(DATA.scrapedAt).getTime() + intervalMs);
     document.getElementById('sNext').textContent = next.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
   }
   document.getElementById('sReps').textContent = (DATA.today?.reps?.length || 0);
