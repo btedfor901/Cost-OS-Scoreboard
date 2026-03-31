@@ -7,7 +7,7 @@ Environment variables (set in Railway):
   GMAIL_TOKEN        – contents of token.json (JSON string)
   GMAIL_CREDENTIALS  – contents of credentials.json (JSON string)
   PORT               – automatically set by Railway
-  (scraper runs every 5 min 7 AM–7 PM CST, hourly outside those hours)
+  (scraper runs every 5 min 8 AM–5 PM CST Mon–Fri, hourly outside those hours)
 """
 
 import os
@@ -38,7 +38,7 @@ SCOPES    = [
 ]
 DIR       = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(DIR, "data.json")
-INTERVAL_ACTIVE = 5 * 60    # 5 min  — 7 AM–7 PM CST
+INTERVAL_ACTIVE = 5 * 60    # 5 min  — 8 AM–5 PM CST Mon–Fri
 INTERVAL_OFF    = 60 * 60   # 1 hour — outside business hours
 ADMIN_PIN = os.environ.get("ADMIN_PIN", "costos2026")
 
@@ -565,9 +565,11 @@ def _record_failure(msg):
 _CST = ZoneInfo("America/Chicago")
 
 def _scrape_interval() -> int:
-    """Return the appropriate wait time based on CST time-of-day."""
-    hour = datetime.now(_CST).hour  # 0–23
-    if 7 <= hour < 19:  # 7 AM – 7 PM CST
+    """Return the appropriate wait time based on CST time-of-day and day-of-week."""
+    now  = datetime.now(_CST)
+    hour = now.hour        # 0–23
+    dow  = now.weekday()   # 0=Mon … 6=Sun
+    if dow < 5 and 8 <= hour < 17:  # Mon–Fri, 8 AM–5 PM CST
         return INTERVAL_ACTIVE
     return INTERVAL_OFF
 

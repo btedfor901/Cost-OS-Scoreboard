@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cost-OS Scoreboard</title>
+  <link rel="icon" type="image/png" href="/static/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('costos-theme') || 'dark')</script>
@@ -128,6 +129,9 @@
     .stat-card:hover{transform:translateY(-3px);box-shadow:var(--sh2);border-color:rgba(0,102,255,.25)}
     .stat-label{font-size:.7rem;color:var(--dim);margin-bottom:.5rem;font-weight:500;letter-spacing:.01em}
     .stat-value{font-size:1.75rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.02em}
+    .stat-delta{font-size:.68rem;font-weight:600;margin-top:.4rem;letter-spacing:.01em}
+    .delta-pos{color:#10b981}
+    .delta-neg{color:#ef4444}
 
     /* ── Leaderboard ── */
     .lb-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
@@ -154,8 +158,12 @@
     .rep-row.rank-1 .avatar{box-shadow:0 0 14px rgba(251,191,36,.35);border:2px solid rgba(251,191,36,.35)}
 
     .rep-mid{flex:1;min-width:0}
-    .rep-name{font-size:.875rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.375rem}
-    .rep-row.rank-1 .rep-name{font-weight:600}
+    .rep-name{display:flex;align-items:center;gap:.3rem;margin-bottom:.375rem}
+    .rep-name-text{font-size:.875rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+    .rep-row.rank-1 .rep-name-text{font-weight:600}
+    .rank-up{font-size:.6rem;font-weight:700;color:#10b981;flex-shrink:0}
+    .rank-dn{font-size:.6rem;font-weight:700;color:#ef4444;flex-shrink:0}
+    .rank-new{font-size:.58rem;font-weight:700;color:var(--brand);flex-shrink:0;letter-spacing:.03em}
     .rep-bar-track{height:.25rem;background:var(--card);border-radius:9999px;overflow:hidden}
     .rep-bar-fill{height:100%;border-radius:9999px;background:var(--grad);width:0;transition:width .9s cubic-bezier(.4,0,.2,1)}
     .win-streak{font-size:.62rem;font-weight:600;color:#FBBF24;margin-top:.2rem;letter-spacing:.01em}
@@ -385,6 +393,23 @@ function getRange(tab) {
   return [toYMD(today), toYMD(today)];
 }
 
+// ── Previous period range ─────────────────────────────────────────────────────
+function getPrevRange(tab, start, end) {
+  if (tab === 'today') {
+    const d = new Date(start); d.setDate(d.getDate() - 1); const s = toYMD(d); return [s, s];
+  }
+  if (tab === 'yesterday') {
+    const d = new Date(start); d.setDate(d.getDate() - 1); const s = toYMD(d); return [s, s];
+  }
+  // For all other ranges: shift back by the same duration
+  const startDate = new Date(start + 'T00:00:00');
+  const endDate   = new Date(end   + 'T00:00:00');
+  const days = Math.round((endDate - startDate) / 86400000) + 1;
+  const prevEnd   = new Date(startDate); prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);   prevStart.setDate(prevEnd.getDate() - days + 1);
+  return [toYMD(prevStart), toYMD(prevEnd)];
+}
+
 // ── Aggregate ─────────────────────────────────────────────────────────────────
 function aggregate(history, start, end) {
   const map = {};
@@ -483,6 +508,23 @@ function render() {
   if (!DATA) { el.innerHTML = `<div class="loading">Loading data…</div>`; return; }
 
   const [start, end] = getRange(activeTab);
+  const [prevStart, prevEnd] = getPrevRange(activeTab, start, end);
+  const prevReps    = aggregate(DATA.history, prevStart, prevEnd);
+  const prevByCall  = [...prevReps].sort((a, b) => b.totalCalls - a.totalCalls);
+  const prevByTalk  = [...prevReps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
+  const prevTotalCalls = prevReps.reduce((a, r) => a + r.totalCalls, 0);
+  const prevTotalTalk  = prevReps.reduce((a, r) => a + r.totalTalkTimeSec, 0);
+  const prevAvgTalk    = prevTotalCalls ? Math.round(prevTotalTalk / prevTotalCalls) : 0;
+
+  function deltaBadge(curr, prev) {
+    if (!prev) return '';
+    const pct = Math.round(((curr - prev) / prev) * 100);
+    if (pct === 0) return '';
+    const cls  = pct > 0 ? 'delta-pos' : 'delta-neg';
+    const sign = pct > 0 ? '↑' : '↓';
+    return `<div class="stat-delta ${cls}">${sign}${Math.abs(pct)}% vs prior period</div>`;
+  }
+
   let reps = aggregate(DATA.history, start, end);
 
   // Fallback: today tab uses data.today only if reportDate matches today (resets at midnight)
@@ -510,7 +552,7 @@ function render() {
   // Rank-based blue palette: #1 = brand blue, stepping darker
   const rankColors = ['#0c7dc6','#0a69a8','#08558a','#06416b','#053459','#04294a'];
 
-  function repRow(r, rank, value, maxVal, isTime, winDays = 0) {
+  function repRow(r, rank, value, maxVal, isTime, winDays = 0, prevRanked = null) {
     const pct     = Math.round((value / maxVal) * 100);
     const color   = rankColors[Math.min(rank - 1, rankColors.length - 1)];
     const disp    = isTime ? fmtSec(value) : value.toLocaleString();
@@ -520,11 +562,22 @@ function render() {
     const winLabel = winDays >= 2
       ? `<div class="win-streak">${activeTab === 'today' ? '🔥' : '🏆'} ${isTime ? 'Talk time' : 'Calls'} ${activeTab === 'today' ? `${winDays}-day streak` : `leader — ${winDays} days`}</div>`
       : '';
-    return `<div class="${rowCls}" onclick="openRepModal('${safeName}')">
+    let rankBadge = '';
+    if (prevRanked && prevRanked.length > 0) {
+      const prevIdx = prevRanked.findIndex(pr => pr.name === r.name);
+      if (prevIdx === -1) {
+        rankBadge = `<span class="rank-new">NEW</span>`;
+      } else {
+        const diff = (prevIdx + 1) - rank;
+        if (diff > 0)      rankBadge = `<span class="rank-up">▲${diff}</span>`;
+        else if (diff < 0) rankBadge = `<span class="rank-dn">▼${Math.abs(diff)}</span>`;
+      }
+    }
+    return `<div class="${rowCls}" data-rep="${r.name.replace(/"/g, '&quot;')}" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
       <div class="rep-mid">
-        <div class="rep-name">${r.name}</div>
+        <div class="rep-name"><span class="rep-name-text">${r.name}</span>${rankBadge}</div>
         <div class="rep-bar-track">
           <div class="rep-bar-fill" data-pct="${pct}" style="width:0"></div>
         </div>
@@ -571,27 +624,27 @@ function render() {
     ${emptyRows}
 
     <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Team Total Calls</div><div class="stat-value" data-num="${totalCalls}">${totalCalls.toLocaleString()}</div></div>
-      <div class="stat-card"><div class="stat-label">Team Talk Time</div><div class="stat-value">${fmtSec(totalTalk)}</div></div>
-      <div class="stat-card"><div class="stat-label">Team Avg Talk Time</div><div class="stat-value">${fmtSec(avgTalk)}</div></div>
+      <div class="stat-card" data-stat="calls"><div class="stat-label">Team Total Calls</div><div class="stat-value" data-num="${totalCalls}">${totalCalls.toLocaleString()}</div>${deltaBadge(totalCalls, prevTotalCalls)}</div>
+      <div class="stat-card" data-stat="talk"><div class="stat-label">Team Talk Time</div><div class="stat-value">${fmtSec(totalTalk)}</div>${deltaBadge(totalTalk, prevTotalTalk)}</div>
+      <div class="stat-card" data-stat="avgtalk"><div class="stat-label">Team Avg Talk Time</div><div class="stat-value">${fmtSec(avgTalk)}</div>${deltaBadge(avgTalk, prevAvgTalk)}</div>
       <div class="stat-card"><div class="stat-label">Monthly Demos</div><div class="stat-value" ${DATA.demos ? `data-num="${DATA.demos.total}"` : ''}>${DATA.demos ? DATA.demos.total : '—'}</div></div>
       <div class="stat-card"><div class="stat-label">Active Reps</div><div class="stat-value" data-num="${activeReps}">${activeReps}</div></div>
     </div>
 
     <div class="lb-grid">
-      <div class="lb-card">
+      <div class="lb-card" id="lb-calls">
         <div class="lb-header">
           <span class="lb-title">Total Calls</span>
           <span class="lb-badge">${byCall.length} reps</span>
         </div>
-        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0))).join('')}
+        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0), prevByCall)).join('')}
       </div>
-      <div class="lb-card">
+      <div class="lb-card" id="lb-talk">
         <div class="lb-header">
           <span class="lb-title">Total Talk Time</span>
           <span class="lb-badge">${byTalk.length} reps</span>
         </div>
-        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0))).join('')}
+        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0), prevByTalk)).join('')}
       </div>
     </div>
 
@@ -817,8 +870,152 @@ function updateMeta() {
   document.getElementById('headerMeta').innerHTML = html;
 }
 
+// ── In-place patch for background polls ───────────────────────────────────────
+function patchUpdate() {
+  const el = document.getElementById('main');
+  if (!el || !el.querySelector('[data-stat]')) { render(); return; }
+
+  const [start, end]         = getRange(activeTab);
+  const [prevStart, prevEnd] = getPrevRange(activeTab, start, end);
+  const prevReps       = aggregate(DATA.history, prevStart, prevEnd);
+  const prevTotalCalls = prevReps.reduce((a, r) => a + r.totalCalls, 0);
+  const prevTotalTalk  = prevReps.reduce((a, r) => a + r.totalTalkTimeSec, 0);
+  const prevAvgTalk    = prevTotalCalls ? Math.round(prevTotalTalk / prevTotalCalls) : 0;
+  const prevByCall     = [...prevReps].sort((a, b) => b.totalCalls - a.totalCalls);
+  const prevByTalk     = [...prevReps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
+
+  function deltaBadge(curr, prev) {
+    if (!prev) return '';
+    const pct = Math.round(((curr - prev) / prev) * 100);
+    if (pct === 0) return '';
+    const cls = pct > 0 ? 'delta-pos' : 'delta-neg';
+    return `<div class="stat-delta ${cls}">${pct > 0 ? '↑' : '↓'}${Math.abs(pct)}% vs prior period</div>`;
+  }
+
+  let reps = aggregate(DATA.history, start, end);
+  if (activeTab === 'today' && reps.length === 0 && DATA.today && DATA.today.reps
+      && DATA.today.reportDate === toYMD(new Date())) {
+    reps = DATA.today.reps.map(r => ({...r, daysActive: 1}));
+  }
+
+  const totalCalls = reps.reduce((a, r) => a + r.totalCalls, 0);
+  const totalTalk  = reps.reduce((a, r) => a + r.totalTalkTimeSec, 0);
+  const avgTalk    = totalCalls ? Math.round(totalTalk / totalCalls) : 0;
+  const byCall     = [...reps].sort((a, b) => b.totalCalls - a.totalCalls);
+  const byTalk     = [...reps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
+  const maxCall    = byCall[0]?.totalCalls || 1;
+  const maxTalk    = byTalk[0]?.totalTalkTimeSec || 1;
+  const dayWins    = calcDayWins(DATA.history, start, end);
+  const streaks    = calcStreaks(DATA.history);
+
+  REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
+
+  // Patch a stat card number/delta without rebuilding the DOM
+  function patchStat(attr, numValue, display, delta) {
+    const card = el.querySelector(`[data-stat="${attr}"]`);
+    if (!card) return;
+    const sv = card.querySelector('.stat-value');
+    if (sv) {
+      if ('num' in sv.dataset) {
+        const prev = parseFloat(sv.dataset.num) || 0;
+        sv.dataset.num = numValue;
+        if (numValue !== prev && numValue > 0) countUp(sv, numValue);
+      } else {
+        sv.textContent = display;
+      }
+    }
+    const existing = card.querySelector('.stat-delta');
+    if (delta) {
+      if (existing) existing.outerHTML = delta;
+      else card.insertAdjacentHTML('beforeend', delta);
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+
+  patchStat('calls',   totalCalls, totalCalls.toLocaleString(), deltaBadge(totalCalls, prevTotalCalls));
+  patchStat('talk',    totalTalk,  fmtSec(totalTalk),           deltaBadge(totalTalk,  prevTotalTalk));
+  patchStat('avgtalk', avgTalk,    fmtSec(avgTalk),             deltaBadge(avgTalk,    prevAvgTalk));
+
+  const rankColors = ['#0c7dc6','#0a69a8','#08558a','#06416b','#053459','#04294a'];
+
+  function repRowHTML(r, rank, value, maxVal, isTime, winDays, prevRanked) {
+    const pct      = Math.round((value / maxVal) * 100);
+    const color    = rankColors[Math.min(rank - 1, rankColors.length - 1)];
+    const disp     = isTime ? fmtSec(value) : value.toLocaleString();
+    const rankCls  = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
+    const safeName = r.name.replace(/'/g, "\\'");
+    const rowCls   = rank === 1 ? 'rep-row rank-1' : 'rep-row';
+    const winLabel = winDays >= 2
+      ? `<div class="win-streak">${activeTab === 'today' ? '🔥' : '🏆'} ${isTime ? 'Talk time' : 'Calls'} ${activeTab === 'today' ? `${winDays}-day streak` : `leader — ${winDays} days`}</div>`
+      : '';
+    let rankBadge = '';
+    if (prevRanked && prevRanked.length > 0) {
+      const prevIdx = prevRanked.findIndex(pr => pr.name === r.name);
+      if (prevIdx === -1) rankBadge = `<span class="rank-new">NEW</span>`;
+      else {
+        const diff = (prevIdx + 1) - rank;
+        if (diff > 0)      rankBadge = `<span class="rank-up">▲${diff}</span>`;
+        else if (diff < 0) rankBadge = `<span class="rank-dn">▼${Math.abs(diff)}</span>`;
+      }
+    }
+    return `<div class="${rowCls}" data-rep="${r.name.replace(/"/g, '&quot;')}" onclick="openRepModal('${safeName}')">
+      <div class="rank-dot ${rankCls}">${rank}</div>
+      <div class="avatar" style="background:${color}">${initials(r.name)}</div>
+      <div class="rep-mid">
+        <div class="rep-name"><span class="rep-name-text">${r.name}</span>${rankBadge}</div>
+        <div class="rep-bar-track"><div class="rep-bar-fill" data-pct="${pct}" style="width:${pct}%"></div></div>
+        ${winLabel}
+      </div>
+      <div class="rep-val accent">${disp}</div>
+    </div>`;
+  }
+
+  function patchLeaderboard(lbId, sorted, maxVal, isTime, prevRanked, winFn) {
+    const card = document.getElementById(lbId);
+    if (!card) return;
+    const currentOrder = [...card.querySelectorAll('[data-rep]')].map(r => r.dataset.rep);
+    const newOrder     = sorted.map(r => r.name);
+    if (JSON.stringify(currentOrder) === JSON.stringify(newOrder)) {
+      // Same order — patch values and bars in-place, no DOM rebuild
+      sorted.forEach(r => {
+        const row = [...card.querySelectorAll('[data-rep]')].find(el => el.dataset.rep === r.name);
+        if (!row) return;
+        const value = isTime ? r.totalTalkTimeSec : r.totalCalls;
+        const valEl = row.querySelector('.rep-val');
+        if (valEl) valEl.textContent = isTime ? fmtSec(value) : value.toLocaleString();
+        const bar = row.querySelector('.rep-bar-fill');
+        if (bar) {
+          const pct = Math.round(value / maxVal * 100);
+          bar.dataset.pct = pct;
+          bar.style.width = pct + '%';
+        }
+      });
+    } else {
+      // Rank order changed — crossfade only the rep rows
+      const newRows = sorted.map((r, i) =>
+        repRowHTML(r, i + 1, isTime ? r.totalTalkTimeSec : r.totalCalls, maxVal, isTime, winFn(r), prevRanked)
+      ).join('');
+      card.style.transition = 'opacity .15s ease';
+      card.style.opacity    = '0';
+      setTimeout(() => {
+        [...card.querySelectorAll('[data-rep]')].forEach(r => r.remove());
+        card.insertAdjacentHTML('beforeend', newRows);
+        requestAnimationFrame(() => requestAnimationFrame(() => { card.style.opacity = '1'; }));
+      }, 150);
+    }
+  }
+
+  patchLeaderboard('lb-calls', byCall, maxCall, false, prevByCall,
+    r => activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0));
+  patchLeaderboard('lb-talk',  byTalk, maxTalk, true,  prevByTalk,
+    r => activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0));
+}
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 async function load() {
+  const hadData = DATA !== null;
+
   try {
     const sr = await fetch('/api/display-status');
     if (sr.ok) { const s = await sr.json(); displayOn = s.on; }
@@ -830,9 +1027,11 @@ async function load() {
     DATA = await r.json();
     if (DATA?.scrapedAt) _scrapedAtMs = new Date(DATA.scrapedAt).getTime();
     updateMeta();
-    render();
+    if (hadData) patchUpdate(); else render();
   } catch (_) {
-    document.getElementById('main').innerHTML = `<div class="loading">Scraper is warming up — data will appear shortly.</div>`;
+    if (!hadData) {
+      document.getElementById('main').innerHTML = `<div class="loading">Scraper is warming up — data will appear shortly.</div>`;
+    }
   }
 }
 

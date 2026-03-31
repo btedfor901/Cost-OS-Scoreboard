@@ -1,0 +1,17 @@
+# OAuth credentials — set these as Railway env vars instead
+credentials.json
+token.json
+
+# Runtime / generated
+data.json
+server.log
+*.log
+
+# Claude Code
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
