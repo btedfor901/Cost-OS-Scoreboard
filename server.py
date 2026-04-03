@@ -17,6 +17,7 @@ import base64
 import threading
 import time
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -37,10 +38,13 @@ SCOPES    = [
     "https://www.googleapis.com/auth/drive.readonly",
 ]
 DIR       = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(DIR, "data.json")
+DATA_FILE        = os.path.join(DIR, "data.json")
+ADJUSTMENTS_FILE = os.path.join(DIR, "adjustments.json")
 INTERVAL_ACTIVE = 5 * 60    # 5 min  — 8 AM–5 PM CST Mon–Fri
 INTERVAL_OFF    = 60 * 60   # 1 hour — outside business hours
-ADMIN_PIN = os.environ.get("ADMIN_PIN", "costos2026")
+ADMIN_PIN    = os.environ.get("ADMIN_PIN", "costos2026")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPO  = os.environ.get("GITHUB_REPO", "btedfor901/Cost-OS-Scoreboard")
 
 # ── Display toggle state ──────────────────────────────────────────────────────
 
@@ -101,11 +105,49 @@ def static_files(filename):
 
 @app.route("/health")
 def health():
+    if not _pin_ok():
+        return jsonify({"error": "unauthorized"}), 401
     with _health_lock:
         h = dict(_health)
     h["scheduler_alive"] = bool(_scheduler_thread and _scheduler_thread.is_alive())
     h["status"] = "degraded" if h["consecutive_failures"] >= ALERT_AFTER_FAILURES else "ok"
     return jsonify(h)
+
+
+_pin_attempts  = defaultdict(list)   # ip -> [timestamp, ...]
+_pin_lock      = threading.Lock()
+PIN_MAX        = 10    # max attempts
+PIN_WINDOW     = 300   # per 5 minutes
+
+
+def _pin_ok():
+    """Return True if the request carries the correct admin PIN."""
+    supplied = (
+        flask_request.headers.get("X-Admin-Pin") or
+        (flask_request.get_json(silent=True) or {}).get("pin", "")
+    )
+    return supplied == ADMIN_PIN
+
+
+def _rate_limited():
+    """Return True if this IP has exceeded the PIN attempt limit."""
+    ip  = flask_request.remote_addr or "unknown"
+    now = time.time()
+    with _pin_lock:
+        _pin_attempts[ip] = [t for t in _pin_attempts[ip] if now - t < PIN_WINDOW]
+        if len(_pin_attempts[ip]) >= PIN_MAX:
+            return True
+        _pin_attempts[ip].append(now)
+    return False
+
+
+@app.route("/api/verify-pin", methods=["POST"])
+def verify_pin():
+    if _rate_limited():
+        return jsonify({"ok": False, "error": "too many attempts"}), 429
+    if not _pin_ok():
+        return jsonify({"ok": False}), 401
+    return jsonify({"ok": True})
 
 
 @app.route("/api/display-status")
@@ -115,6 +157,8 @@ def display_status():
 
 @app.route("/api/toggle", methods=["POST"])
 def toggle_display():
+    if not _pin_ok():
+        return jsonify({"error": "unauthorized"}), 401
     global _display_on
     body = flask_request.get_json(silent=True) or {}
     with _display_lock:
@@ -123,10 +167,85 @@ def toggle_display():
     return jsonify({"on": _display_on})
 
 
+@app.route("/api/adjust-rep", methods=["POST"])
+def adjust_rep():
+    """Manually adjust a rep's call/talk-time stats for a given date in data.json."""
+    if not _pin_ok():
+        return jsonify({"error": "unauthorized"}), 401
+    body = flask_request.get_json(silent=True) or {}
+    rep_name     = (body.get("rep") or "").strip()
+    date_str     = (body.get("date") or "").strip()
+    adj_calls    = int(body.get("adjustCalls", 0))
+    adj_talk_sec = int(body.get("adjustSeconds", 0))
+
+    if not rep_name or not date_str:
+        return jsonify({"error": "rep and date are required"}), 400
+
+    if not os.path.exists(DATA_FILE):
+        return jsonify({"error": "data.json not found"}), 404
+
+    try:
+        with open(DATA_FILE) as f:
+            data = json.load(f)
+    except Exception as e:
+        return jsonify({"error": f"Could not read data.json: {e}"}), 500
+
+    changed = False
+
+    # Adjust today's reps
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if date_str == today_str and data.get("today", {}).get("reps"):
+        for r in data["today"]["reps"]:
+            if r["name"] == rep_name:
+                r["totalCalls"]       = max(0, r["totalCalls"] + adj_calls)
+                r["totalTalkTimeSec"] = max(0, r["totalTalkTimeSec"] + adj_talk_sec)
+                r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
+                r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
+                                         if r["totalCalls"] else 0)
+                changed = True
+
+    # Adjust matching history entry
+    for snap in data.get("history", []):
+        if snap["date"] == date_str:
+            for r in snap.get("reps", []):
+                if r["name"] == rep_name:
+                    r["totalCalls"]       = max(0, r["totalCalls"] + adj_calls)
+                    r["totalTalkTimeSec"] = max(0, r["totalTalkTimeSec"] + adj_talk_sec)
+                    r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
+                    r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
+                                             if r["totalCalls"] else 0)
+                    changed = True
+
+    if not changed:
+        return jsonify({"error": f"Rep '{rep_name}' not found for date {date_str}"}), 404
+
+    try:
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        return jsonify({"error": f"Could not write data.json: {e}"}), 500
+
+    # Persist adjustment so future scrapes re-apply it automatically
+    adj_store = _load_adjustments()
+    key = f"{date_str}||{rep_name}"
+    existing_adj = adj_store.get(key, {"rep": rep_name, "date": date_str,
+                                       "adjustCalls": 0, "adjustSeconds": 0})
+    existing_adj["adjustCalls"]   += adj_calls
+    existing_adj["adjustSeconds"] += adj_talk_sec
+    adj_store[key] = existing_adj
+    _save_adjustments(adj_store)
+
+    log.info("Adjusted %s on %s: calls%+d, talk%+ds (persisted)", rep_name, date_str, adj_calls, adj_talk_sec)
+    return jsonify({"ok": True, "rep": rep_name, "date": date_str,
+                    "adjustCalls": adj_calls, "adjustSeconds": adj_talk_sec})
+
+
 _scrape_running = False
 
 @app.route("/api/scrape-now", methods=["POST"])
 def scrape_now():
+    if not _pin_ok():
+        return jsonify({"error": "unauthorized"}), 401
     global _scrape_running
     if _scrape_running:
         return jsonify({"started": False, "reason": "Scrape already in progress"})
@@ -381,6 +500,88 @@ def make_rep(name, calls, talk_sec):
     }
 
 
+def _load_adjustments():
+    """Return stored adjustments as {f'{date}||{rep}': {...}}."""
+    if not os.path.exists(ADJUSTMENTS_FILE):
+        return {}
+    try:
+        with open(ADJUSTMENTS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_adjustments(adj):
+    content = json.dumps(adj, indent=2)
+    with open(ADJUSTMENTS_FILE, "w") as f:
+        f.write(content)
+    if GITHUB_TOKEN:
+        threading.Thread(target=_push_adjustments_to_github,
+                         args=(content,), daemon=True).start()
+
+
+def _push_adjustments_to_github(content):
+    """Commit adjustments.json to GitHub so it survives Railway redeploys."""
+    try:
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/adjustments.json"
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        # Get current SHA (required for update)
+        get_resp = requests.get(api_url, headers=headers, timeout=10)
+        sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+
+        import base64 as _b64
+        payload = {
+            "message": "chore: update adjustments.json",
+            "content": _b64.b64encode(content.encode()).decode(),
+        }
+        if sha:
+            payload["sha"] = sha
+
+        put_resp = requests.put(api_url, headers=headers,
+                                json=payload, timeout=10)
+        if put_resp.status_code in (200, 201):
+            log.info("adjustments.json pushed to GitHub")
+        else:
+            log.warning("GitHub push failed: %d %s",
+                        put_resp.status_code, put_resp.text[:200])
+    except Exception as e:
+        log.warning("GitHub push error: %s", e)
+
+
+def _apply_adjustments_to(data):
+    """Apply all stored adjustments to a data dict in place."""
+    adj = _load_adjustments()
+    if not adj:
+        return
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    for entry in adj.values():
+        date_str     = entry["date"]
+        rep_name     = entry["rep"]
+        adj_calls    = entry["adjustCalls"]
+        adj_talk_sec = entry["adjustSeconds"]
+
+        def _patch(r):
+            r["totalCalls"]       = max(0, r["totalCalls"] + adj_calls)
+            r["totalTalkTimeSec"] = max(0, r["totalTalkTimeSec"] + adj_talk_sec)
+            r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
+            r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
+                                     if r["totalCalls"] else 0)
+
+        if date_str == today_str:
+            for r in data.get("today", {}).get("reps", []):
+                if r["name"] == rep_name:
+                    _patch(r)
+
+        for snap in data.get("history", []):
+            if snap["date"] == date_str:
+                for r in snap.get("reps", []):
+                    if r["name"] == rep_name:
+                        _patch(r)
+
+
 def fmt_dur(secs):
     secs = int(secs)
     h, rem = divmod(secs, 3600)
@@ -526,6 +727,10 @@ def run_scrape():
         "demos":   {"total": demos_total, "reps": demos_reps},
         "intraday": intraday_data,
     }
+
+    # Re-apply any manual adjustments on top of fresh Nextiva data
+    _apply_adjustments_to(data)
+
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
     log.info("Saved %d days of history (%d reps today)", len(history), len(today_reps))

@@ -265,8 +265,22 @@
 </head>
 <body>
 
+<!-- ── PIN Gate ── -->
+<div id="pinGate" style="display:none">
+  <div class="pin-card">
+    <div class="pin-logo">C</div>
+    <h1>Cost-<span>OS</span> Admin</h1>
+    <p>Enter your admin PIN to continue</p>
+    <input id="pinInput" class="pin-input" type="password" placeholder="••••••••"
+           maxlength="32" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')submitPin()" />
+    <div class="pin-err" id="pinErr"></div>
+    <button class="pin-submit" onclick="submitPin()">Unlock</button>
+  </div>
+</div>
+
 <!-- ── Dashboard ── -->
-<div id="dashboard">
+<div id="dashboard" style="display:none">
   <div class="topbar">
     <div class="topbar-left">
       <div class="topbar-logo">C</div>
@@ -328,6 +342,39 @@
         <span class="btn-text">Scrape Now</span>
       </button>
       <div id="scrapeResult"></div>
+    </div>
+
+    <!-- Adjust Rep Stats -->
+    <div class="card">
+      <div class="card-title"><span class="icon">✂️</span> Adjust Rep Stats</div>
+      <p class="desc">Manually correct a rep's call count or talk time for a specific date (e.g. remove a bogus call).</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Rep</label>
+          <select id="adjRep" class="date-sel" style="width:100%;padding:0.5rem 0.75rem">
+            <option value="">— select rep —</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Date</label>
+          <input id="adjDate" type="date" class="date-sel" style="width:100%;padding:0.5rem 0.75rem" />
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Talk Time Adjustment (minutes)</label>
+          <input id="adjMinutes" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem"
+                 placeholder="e.g. -30 to deduct 30 min" step="1" value="-30" />
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Call Count Adjustment</label>
+          <input id="adjCalls" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem"
+                 placeholder="e.g. -1 to remove a call" step="1" value="-1" />
+        </div>
+      </div>
+      <button class="btn btn-brand" id="adjBtn" onclick="doAdjust()">
+        <span class="spinner"></span>
+        <span class="btn-text">Apply Adjustment</span>
+      </button>
+      <div id="adjResult" style="margin-top:0.75rem;font-size:0.8rem;color:var(--sub);min-height:1.2em"></div>
     </div>
 
     <!-- Access Links -->
@@ -416,6 +463,9 @@ let DATA      = null;
 let dispOn    = true;
 let chartInst = null;
 
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 function initials(n) { return n.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -446,6 +496,7 @@ async function loadData() {
     updateStatus();
     rebuildChart();
     renderAnalytics();
+    populateAdjRepDropdown();
   } catch(_) {}
 
   try {
@@ -514,7 +565,7 @@ async function doScrape() {
   res.textContent = 'Scraping Nextiva…';
   try {
     const r = await fetch('/api/scrape-now', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: authHeaders(),
       body: JSON.stringify({}),
     });
     const d = await r.json();
@@ -531,6 +582,64 @@ async function doScrape() {
   }
 }
 
+// ── Adjust Rep Stats ──────────────────────────────────────────────────────────
+function populateAdjRepDropdown() {
+  if (!DATA) return;
+  const sel = document.getElementById('adjRep');
+  const current = sel.value;
+  const names = [...new Set([
+    ...(DATA.today?.reps || []).map(r => r.name),
+    ...(DATA.history || []).flatMap(s => s.reps.map(r => r.name)),
+  ])].sort();
+  sel.innerHTML = '<option value="">— select rep —</option>' +
+    names.map(n => `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  // Default date to today
+  if (!document.getElementById('adjDate').value) {
+    document.getElementById('adjDate').value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+async function doAdjust() {
+  const rep     = document.getElementById('adjRep').value.trim();
+  const date    = document.getElementById('adjDate').value.trim();
+  const minutes = parseInt(document.getElementById('adjMinutes').value) || 0;
+  const calls   = parseInt(document.getElementById('adjCalls').value) || 0;
+  const res     = document.getElementById('adjResult');
+
+  if (!rep)  { res.textContent = 'Please select a rep.'; res.style.color = '#ef4444'; return; }
+  if (!date) { res.textContent = 'Please select a date.'; res.style.color = '#ef4444'; return; }
+  if (minutes === 0 && calls === 0) { res.textContent = 'No adjustment specified.'; res.style.color = '#ef4444'; return; }
+
+  const btn = document.getElementById('adjBtn');
+  btn.classList.add('loading'); btn.disabled = true;
+  res.textContent = 'Applying…'; res.style.color = 'var(--sub)';
+
+  try {
+    const r = await fetch('/api/adjust-rep', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ rep, date, adjustSeconds: minutes * 60, adjustCalls: calls }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      const talkPart  = minutes !== 0 ? `${minutes > 0 ? '+' : ''}${minutes} min talk` : '';
+      const callsPart = calls  !== 0 ? `${calls > 0 ? '+' : ''}${calls} call${Math.abs(calls) !== 1 ? 's' : ''}` : '';
+      const summary   = [talkPart, callsPart].filter(Boolean).join(', ');
+      showToast(`Adjusted ${rep}: ${summary}`, 'success');
+      res.textContent = `Done — applied ${summary} to ${rep} on ${date}.`;
+      res.style.color = '#10b981';
+      await loadData();
+    } else {
+      res.textContent = `Error: ${d.error || 'Unknown error'}`;
+      res.style.color = '#ef4444';
+    }
+  } catch(e) {
+    res.textContent = 'Network error: ' + e.message;
+    res.style.color = '#ef4444';
+  } finally {
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
 // ── Display toggle ────────────────────────────────────────────────────────────
 function updateDisplayToggle() {
   const el = document.getElementById('dispToggle');
@@ -542,7 +651,7 @@ function updateDisplayToggle() {
 async function setDisplay(on) {
   try {
     const r = await fetch('/api/toggle', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: authHeaders(),
       body: JSON.stringify({ on }),
     });
     if (!r.ok) { showToast('PIN rejected', 'error'); return; }
@@ -697,7 +806,7 @@ function renderChart() {
 function buildLegend(repNames) {
   document.getElementById('chartLegend').innerHTML = repNames.map(n => `
     <div class="leg-item">
-      <div class="leg-dot" style="background:${repColor(n, repNames)}"></div>${n.split(' ')[0]}
+      <div class="leg-dot" style="background:${repColor(n, repNames)}"></div>${esc(n.split(' ')[0])}
     </div>`).join('');
 }
 
@@ -791,7 +900,7 @@ function renderAnalytics() {
       <div class="analytics-rep-header">
         <div class="rep-avatar" style="background:${color}">${initials(name)}</div>
         <div>
-          <div class="rep-full-name">${name}</div>
+          <div class="rep-full-name">${esc(name)}</div>
           <div class="rep-meta">${n} day${n !== 1 ? 's' : ''} of data</div>
         </div>
       </div>
@@ -876,8 +985,54 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+// ── PIN helpers ───────────────────────────────────────────────────────────────
+function getPin() { return sessionStorage.getItem('costos-pin') || ''; }
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'X-Admin-Pin': getPin() };
+}
+
+async function submitPin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  const err = document.getElementById('pinErr');
+  err.textContent = '';
+  if (!pin) { err.textContent = 'Enter your PIN'; return; }
+  try {
+    const r = await fetch('/api/verify-pin', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin },
+      body: JSON.stringify({}),
+    });
+    if (r.ok) {
+      sessionStorage.setItem('costos-pin', pin);
+      document.getElementById('pinGate').style.display = 'none';
+      document.getElementById('dashboard').style.display = '';
+      init();
+    } else {
+      err.textContent = 'Incorrect PIN';
+      document.getElementById('pinInput').value = '';
+    }
+  } catch(e) {
+    err.textContent = 'Network error';
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
-init();
+(async function boot() {
+  const saved = getPin();
+  if (saved) {
+    const r = await fetch('/api/verify-pin', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': saved },
+      body: JSON.stringify({}),
+    }).catch(() => ({ ok: false }));
+    if (r.ok) {
+      document.getElementById('dashboard').style.display = '';
+      init();
+      return;
+    }
+    sessionStorage.removeItem('costos-pin');
+  }
+  document.getElementById('pinGate').style.display = '';
+})();
 
 // Theme icon init
 (function() {
