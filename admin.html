@@ -360,9 +360,9 @@
           <input id="adjDate" type="date" class="date-sel" style="width:100%;padding:0.5rem 0.75rem" />
         </div>
         <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Talk Time Adjustment (minutes)</label>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Talk Time Adjustment (seconds)</label>
           <input id="adjMinutes" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem"
-                 placeholder="e.g. -30 to deduct 30 min" step="1" value="-30" />
+                 placeholder="e.g. -1800 to deduct 30 min" step="1" value="-1800" />
         </div>
         <div>
           <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Call Count Adjustment</label>
@@ -617,11 +617,11 @@ async function doAdjust() {
   try {
     const r = await fetch('/api/adjust-rep', {
       method: 'POST', headers: authHeaders(),
-      body: JSON.stringify({ rep, date, adjustSeconds: minutes * 60, adjustCalls: calls }),
+      body: JSON.stringify({ rep, date, adjustSeconds: minutes, adjustCalls: calls }),
     });
     const d = await r.json();
     if (d.ok) {
-      const talkPart  = minutes !== 0 ? `${minutes > 0 ? '+' : ''}${minutes} min talk` : '';
+      const talkPart  = minutes !== 0 ? `${minutes > 0 ? '+' : ''}${minutes}s talk` : '';
       const callsPart = calls  !== 0 ? `${calls > 0 ? '+' : ''}${calls} call${Math.abs(calls) !== 1 ? 's' : ''}` : '';
       const summary   = [talkPart, callsPart].filter(Boolean).join(', ');
       showToast(`Adjusted ${rep}: ${summary}`, 'success');
