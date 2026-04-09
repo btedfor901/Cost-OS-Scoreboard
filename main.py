@@ -54,7 +54,7 @@ def auth_gmail():
                 print("ERROR: credentials.json not found.")
                 sys.exit(1)
             flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_local_server(port=0, open_browser=False)
         with open(token_path, "w") as f:
             f.write(creds.to_json())
 

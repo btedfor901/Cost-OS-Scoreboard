@@ -264,6 +264,55 @@ def scrape_now():
 
 # ── Gmail Auth (env-var first, fallback to files) ─────────────────────────────
 
+def _push_token_to_github(token_json: str):
+    """Persist refreshed token.json to GitHub so it survives Railway redeploys."""
+    if not GITHUB_TOKEN:
+        return
+    try:
+        import base64 as _b64
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/token.json"
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        get_resp = requests.get(api_url, headers=headers, timeout=10)
+        sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+        payload = {
+            "message": "chore: refresh Gmail token",
+            "content": _b64.b64encode(token_json.encode()).decode(),
+        }
+        if sha:
+            payload["sha"] = sha
+        put_resp = requests.put(api_url, headers=headers, json=payload, timeout=10)
+        if put_resp.status_code in (200, 201):
+            log.info("token.json pushed to GitHub")
+        else:
+            log.warning("GitHub token push failed: %d %s", put_resp.status_code, put_resp.text[:200])
+    except Exception as e:
+        log.warning("GitHub token push error: %s", e)
+
+
+def _pull_token_from_github(token_path: str):
+    """Pull the latest token.json from GitHub — may be fresher than the env var."""
+    if not GITHUB_TOKEN:
+        return
+    try:
+        import base64 as _b64
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/token.json"
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+        resp = requests.get(api_url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            content = _b64.b64decode(resp.json()["content"]).decode()
+            with open(token_path, "w") as f:
+                f.write(content)
+            log.info("token.json pulled from GitHub")
+    except Exception as e:
+        log.warning("GitHub token pull error: %s", e)
+
+
 def auth_gmail():
     token_env = os.environ.get("GMAIL_TOKEN")
     creds_env = os.environ.get("GMAIL_CREDENTIALS")
@@ -279,6 +328,10 @@ def auth_gmail():
         with open(creds_path, "w") as f:
             f.write(creds_env)
 
+    # Pull the latest token from GitHub — it may be fresher than the env var
+    # (e.g. after an in-process refresh that survived a previous run)
+    _pull_token_from_github(token_path)
+
     creds = None
     if os.path.exists(token_path):
         creds = Credentials.from_authorized_user_file(token_path, SCOPES)
@@ -286,10 +339,12 @@ def auth_gmail():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            token_json = creds.to_json()
             with open(token_path, "w") as f:
-                f.write(creds.to_json())
-            # Update env var cache
-            os.environ["GMAIL_TOKEN"] = creds.to_json()
+                f.write(token_json)
+            os.environ["GMAIL_TOKEN"] = token_json
+            # Push refreshed token to GitHub so future restarts pick it up
+            threading.Thread(target=_push_token_to_github, args=(token_json,), daemon=True).start()
         else:
             raise RuntimeError(
                 "GMAIL_TOKEN env var missing or expired, and no credentials.json available. "
