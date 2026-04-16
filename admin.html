@@ -1017,7 +1017,9 @@ function generateReport() {
     return;
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10);
   const rows = [...DATA.history]
+    .filter(snap => snap.date < todayStr)
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(snap => {
       const r = snap.reps.find(r => r.name === rep);
