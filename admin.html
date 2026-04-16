@@ -1077,12 +1077,14 @@ function generateReport() {
 
   // Table rows (newest first)
   const tableRows = [...rows].reverse().map(r => {
-    const dt      = new Date(r.date + 'T12:00:00');
-    const dateFmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const dt         = new Date(r.date + 'T12:00:00');
+    const dateFmt    = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const avgPerCall = r.calls > 0 ? fmtSec(Math.round(r.talkSec / r.calls)) : '—';
     return `<tr>
       <td>${dateFmt}</td>
       <td class="calls-val" style="text-align:right">${r.calls}</td>
       <td style="font-variant-numeric:tabular-nums">${fmtSec(r.talkSec)}</td>
+      <td style="font-variant-numeric:tabular-nums">${avgPerCall}</td>
     </tr>`;
   }).join('');
 
@@ -1152,6 +1154,7 @@ function generateReport() {
                 <th>Date</th>
                 <th style="text-align:right">Calls</th>
                 <th>Talk Time</th>
+                <th>Avg / Call</th>
               </tr>
             </thead>
             <tbody>${tableRows}</tbody>
@@ -1160,11 +1163,13 @@ function generateReport() {
                 <td>Total</td>
                 <td class="calls-val" style="text-align:right">${totalCalls}</td>
                 <td style="font-variant-numeric:tabular-nums">${fmtSec(totalTalk)}</td>
+                <td>${avgTalkCall}</td>
               </tr>
               <tr>
                 <td>Daily Average</td>
                 <td class="calls-val" style="text-align:right">${avgCalls}</td>
                 <td>${avgTalkDay}</td>
+                <td>${avgTalkCall}</td>
               </tr>
             </tfoot>
           </table>
