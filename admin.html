@@ -1017,11 +1017,14 @@ function generateReport() {
     return;
   }
 
-  const sorted = [...DATA.history].sort((a, b) => a.date.localeCompare(b.date)).slice(-days);
-  const rows   = sorted.map(snap => {
-    const r = snap.reps.find(r => r.name === rep);
-    return { date: snap.date, calls: r?.totalCalls ?? 0, talkSec: r?.totalTalkTimeSec ?? 0 };
-  }).filter(r => r.calls > 0 || r.talkSec > 0);
+  const rows = [...DATA.history]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(snap => {
+      const r = snap.reps.find(r => r.name === rep);
+      return { date: snap.date, calls: r?.totalCalls ?? 0, talkSec: r?.totalTalkTimeSec ?? 0 };
+    })
+    .filter(r => r.calls > 0 || r.talkSec > 0)
+    .slice(-days);
 
   if (!rows.length) {
     out.innerHTML = `<div style="color:var(--dim);font-size:0.8rem">No activity found for <strong>${esc(rep)}</strong> in the last ${days} days.</div>`;
