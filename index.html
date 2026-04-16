@@ -308,6 +308,9 @@ if (window.location.pathname !== '/manage') {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 let DATA         = null;
 let REPS_DATA    = null;
 let activeTab    = 'today';
@@ -577,7 +580,7 @@ function render() {
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
       <div class="rep-mid">
-        <div class="rep-name"><span class="rep-name-text">${r.name}</span>${rankBadge}</div>
+        <div class="rep-name"><span class="rep-name-text">${esc(r.name)}</span>${rankBadge}</div>
         <div class="rep-bar-track">
           <div class="rep-bar-fill" data-pct="${pct}" style="width:0"></div>
         </div>
@@ -661,7 +664,7 @@ function render() {
           const val = avgMode === 'talk' ? fmtSec(r.avgTalkTimeSec) : r.totalCalls.toLocaleString();
           const sub = avgMode === 'talk' ? 'avg per call' : 'total calls';
           return `<div class="avg-inner">
-            <div class="avg-name">${r.name}</div>
+            <div class="avg-name">${esc(r.name)}</div>
             <div class="avg-value">${val}</div>
             <div class="avg-sub">${sub}</div>
           </div>`;
@@ -678,7 +681,7 @@ function render() {
       <div class="demos-grid">
         ${DATA.demos.reps.map(r => `
           <div class="demo-rep">
-            <div class="demo-rep-name">${r.name}</div>
+            <div class="demo-rep-name">${esc(r.name)}</div>
             <div class="demo-rep-count">${r.demos}</div>
             <div class="demo-rep-label">demos this month</div>
           </div>`).join('')}
@@ -751,7 +754,7 @@ function openRepModal(name) {
     <div class="rmo-header">
       <div class="rmo-avatar" style="background:${color}">${initials(name)}</div>
       <div class="rmo-name">
-        <strong>${name}</strong>
+        <strong>${esc(name)}</strong>
         <small>Daily Performance Analytics</small>
       </div>
       <button class="rmo-close" onclick="closeRepModal()">×</button>
@@ -823,7 +826,7 @@ async function doVerify() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
     });
-    if (res.status === 403) {
+    if (res.status === 401 || res.status === 429) {
       document.getElementById('pinErr').classList.remove('hidden');
       return;
     }
@@ -963,7 +966,7 @@ function patchUpdate() {
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
       <div class="rep-mid">
-        <div class="rep-name"><span class="rep-name-text">${r.name}</span>${rankBadge}</div>
+        <div class="rep-name"><span class="rep-name-text">${esc(r.name)}</span>${rankBadge}</div>
         <div class="rep-bar-track"><div class="rep-bar-fill" data-pct="${pct}" style="width:${pct}%"></div></div>
         ${winLabel}
       </div>

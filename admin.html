@@ -248,6 +248,24 @@
     .day-box .db-val   { font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; }
     .day-box-header { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.375rem; font-weight: 600; }
 
+    /* ── Report table ── */
+    .report-table { width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:0.25rem; }
+    .report-table th {
+      background: var(--raised); color: var(--dim);
+      font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.05em;
+      font-weight: 600; padding: 0.5rem 0.75rem; text-align: left;
+    }
+    .report-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--divider); }
+    .report-table tbody tr:last-child td { border-bottom: none; }
+    .report-table tfoot td {
+      background: var(--raised); font-weight: 700; font-size: 0.8rem;
+      border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider);
+    }
+    .report-table tfoot tr:last-child td { border-bottom: none; }
+    .report-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.625rem; }
+    .report-header-title { font-size:0.82rem; font-weight:600; }
+    .report-header-sub { font-size:0.72rem; color:var(--sub); margin-top:0.15rem; }
+
     /* ── Toast ── */
     .toast {
       position: fixed; bottom: 1.5rem; right: 1.5rem;
@@ -452,6 +470,38 @@
       <div id="repAnalytics"></div>
     </div>
 
+    <!-- Generate Report -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span> Generate Report</div>
+      <p class="desc">Select a rep and a date range to see their daily call count and talk time.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Rep</label>
+          <select id="rptRep" class="date-sel" style="width:100%;padding:0.5rem 0.75rem">
+            <option value="">— select rep —</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Days to Include</label>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input id="rptDays" type="number" class="date-sel"
+                   style="width:5rem;padding:0.5rem 0.625rem;flex-shrink:0"
+                   value="30" min="1" max="90" />
+            <div class="tab-row">
+              <button class="tab-btn" onclick="setRptDays(7)">7</button>
+              <button class="tab-btn" onclick="setRptDays(14)">14</button>
+              <button class="tab-btn" onclick="setRptDays(30)">30</button>
+              <button class="tab-btn" onclick="setRptDays(90)">90</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-brand" onclick="generateReport()">
+        <span class="btn-text">Generate Report</span>
+      </button>
+      <div id="reportOutput" style="margin-top:1rem"></div>
+    </div>
+
   </div>
 </div>
 
@@ -497,6 +547,7 @@ async function loadData() {
     rebuildChart();
     renderAnalytics();
     populateAdjRepDropdown();
+    populateRptRepDropdown();
   } catch(_) {}
 
   try {
@@ -974,6 +1025,120 @@ function renderAnalytics() {
       });
     });
   });
+}
+
+// ── Generate Report ───────────────────────────────────────────────────────────
+function populateRptRepDropdown() {
+  if (!DATA) return;
+  const sel = document.getElementById('rptRep');
+  const current = sel.value;
+  const names = [...new Set([
+    ...(DATA.today?.reps || []).map(r => r.name),
+    ...(DATA.history || []).flatMap(s => s.reps.map(r => r.name)),
+  ])].sort();
+  sel.innerHTML = '<option value="">— select rep —</option>' +
+    names.map(n => `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
+
+function setRptDays(n) {
+  document.getElementById('rptDays').value = n;
+}
+
+function generateReport() {
+  const rep  = document.getElementById('rptRep').value.trim();
+  const days = Math.max(1, parseInt(document.getElementById('rptDays').value) || 30);
+  const out  = document.getElementById('reportOutput');
+
+  if (!rep) {
+    out.innerHTML = `<div style="color:#ef4444;font-size:0.8rem">Please select a rep.</div>`;
+    return;
+  }
+  if (!DATA?.history?.length) {
+    out.innerHTML = `<div style="color:var(--dim);font-size:0.8rem">No history data available.</div>`;
+    return;
+  }
+
+  // Sort ascending, take the last N days, filter to rows for this rep
+  const sorted = [...DATA.history].sort((a, b) => a.date.localeCompare(b.date)).slice(-days);
+  const rows = sorted.map(snap => {
+    const r = snap.reps.find(r => r.name === rep);
+    return { date: snap.date, calls: r?.totalCalls ?? 0, talkSec: r?.totalTalkTimeSec ?? 0 };
+  }).filter(r => r.calls > 0 || r.talkSec > 0);
+
+  if (!rows.length) {
+    out.innerHTML = `<div style="color:var(--dim);font-size:0.8rem">No activity found for <strong>${esc(rep)}</strong> in the last ${days} days.</div>`;
+    return;
+  }
+
+  const totalCalls = rows.reduce((a, r) => a + r.calls, 0);
+  const totalTalk  = rows.reduce((a, r) => a + r.talkSec, 0);
+  const avgCalls   = (totalCalls / rows.length).toFixed(1);
+  const avgTalk    = fmtSec(Math.round(totalTalk / rows.length));
+
+  // Display newest first
+  const tableRows = [...rows].reverse().map(r => {
+    const dt      = new Date(r.date + 'T12:00:00');
+    const dateFmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return `<tr>
+      <td>${dateFmt}</td>
+      <td style="font-variant-numeric:tabular-nums;text-align:right">${r.calls}</td>
+      <td style="font-variant-numeric:tabular-nums">${fmtSec(r.talkSec)}</td>
+    </tr>`;
+  }).join('');
+
+  out.innerHTML = `
+    <div class="report-header">
+      <div>
+        <div class="report-header-title">${esc(rep)}</div>
+        <div class="report-header-sub">Last ${days} days · ${rows.length} day${rows.length !== 1 ? 's' : ''} with activity</div>
+      </div>
+      <button class="copy-btn" onclick="exportReportCSV()">Export CSV</button>
+    </div>
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th style="text-align:right">Total Calls</th>
+          <th>Talk Time</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot>
+        <tr>
+          <td>Total (${rows.length} days)</td>
+          <td style="text-align:right">${totalCalls}</td>
+          <td>${fmtSec(totalTalk)}</td>
+        </tr>
+        <tr>
+          <td>Daily Average</td>
+          <td style="text-align:right">${avgCalls}</td>
+          <td>${avgTalk}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  // Stash for CSV export (ascending order)
+  window._rptData = { rep, rows };
+}
+
+function exportReportCSV() {
+  if (!window._rptData) return;
+  const { rep, rows } = window._rptData;
+  const lines = ['Date,Total Calls,Talk Time Seconds,Talk Time'];
+  for (const r of rows) {
+    lines.push(`${r.date},${r.calls},${r.talkSec},${fmtSec(r.talkSec)}`);
+  }
+  const totalCalls = rows.reduce((a, r) => a + r.calls, 0);
+  const totalTalk  = rows.reduce((a, r) => a + r.talkSec, 0);
+  lines.push(`TOTAL,${totalCalls},${totalTalk},${fmtSec(totalTalk)}`);
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `report_${rep.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
