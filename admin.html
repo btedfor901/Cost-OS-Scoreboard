@@ -36,39 +36,6 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Inter, system-ui, sans-serif; background: var(--page); color: var(--heading); min-height: 100vh; }
 
-    /* ── PIN Gate ── */
-    #pinGate {
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center; padding: 2rem;
-    }
-    .pin-card {
-      background: var(--card); border: 1px solid var(--divider); border-radius: 1.25rem;
-      padding: 2.5rem; width: 100%; max-width: 380px; text-align: center;
-    }
-    .pin-logo {
-      width: 3rem; height: 3rem; border-radius: 0.625rem; background: var(--brand);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0 auto 1.25rem;
-    }
-    .pin-card h1 { font-size: 1.25rem; font-weight: 800; margin-bottom: 0.375rem; }
-    .pin-card h1 span { color: var(--brand); }
-    .pin-card p { font-size: 0.8rem; color: var(--sub); margin-bottom: 1.75rem; }
-    .pin-input {
-      width: 100%; padding: 0.75rem 1rem; border-radius: 0.625rem;
-      border: 1px solid var(--divider); background: var(--raised); color: var(--heading);
-      font-family: inherit; font-size: 1rem; text-align: center; letter-spacing: 0.25em;
-      margin-bottom: 0.75rem;
-    }
-    .pin-input:focus { outline: none; border-color: var(--brand); }
-    .pin-err { font-size: 0.78rem; color: #ef4444; margin-bottom: 0.75rem; min-height: 1.2em; }
-    .pin-submit {
-      width: 100%; padding: 0.75rem; border-radius: 0.625rem; border: none;
-      background: var(--brand); color: #fff; font-family: inherit;
-      font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background .15s;
-    }
-    .pin-submit:hover { background: var(--brand-h); }
-
-
     .topbar {
       background: color-mix(in srgb, var(--card) 80%, transparent);
       backdrop-filter: blur(12px);
@@ -300,22 +267,8 @@
 </head>
 <body>
 
-<!-- ── PIN Gate ── -->
-<div id="pinGate" style="display:none">
-  <div class="pin-card">
-    <div class="pin-logo">C</div>
-    <h1>Cost-<span>OS</span> Admin</h1>
-    <p>Enter your admin PIN to continue</p>
-    <input id="pinInput" class="pin-input" type="password" placeholder="••••••••"
-           maxlength="32" autocomplete="current-password"
-           onkeydown="if(event.key==='Enter')submitPin()" />
-    <div class="pin-err" id="pinErr"></div>
-    <button class="pin-submit" onclick="submitPin()">Unlock</button>
-  </div>
-</div>
-
 <!-- ── Dashboard ── -->
-<div id="dashboard" style="display:none">
+<div id="dashboard">
   <div class="topbar">
     <div class="topbar-left">
       <div class="topbar-logo">C</div>
@@ -1211,54 +1164,13 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-// ── PIN helpers ───────────────────────────────────────────────────────────────
-function getPin() { return sessionStorage.getItem('costos-pin') || ''; }
-
+// ── Auth headers (PIN sent automatically for API calls) ───────────────────────
 function authHeaders() {
-  return { 'Content-Type': 'application/json', 'X-Admin-Pin': getPin() };
-}
-
-async function submitPin() {
-  const pin = document.getElementById('pinInput').value.trim();
-  const err = document.getElementById('pinErr');
-  err.textContent = '';
-  if (!pin) { err.textContent = 'Enter your PIN'; return; }
-  try {
-    const r = await fetch('/api/verify-pin', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin },
-      body: JSON.stringify({}),
-    });
-    if (r.ok) {
-      sessionStorage.setItem('costos-pin', pin);
-      document.getElementById('pinGate').style.display = 'none';
-      document.getElementById('dashboard').style.display = '';
-      init();
-    } else {
-      err.textContent = 'Incorrect PIN';
-      document.getElementById('pinInput').value = '';
-    }
-  } catch(e) {
-    err.textContent = 'Network error';
-  }
+  return { 'Content-Type': 'application/json', 'X-Admin-Pin': 'costos2026' };
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-(async function boot() {
-  const saved = getPin();
-  if (saved) {
-    const r = await fetch('/api/verify-pin', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': saved },
-      body: JSON.stringify({}),
-    }).catch(() => ({ ok: false }));
-    if (r.ok) {
-      document.getElementById('dashboard').style.display = '';
-      init();
-      return;
-    }
-    sessionStorage.removeItem('costos-pin');
-  }
-  document.getElementById('pinGate').style.display = '';
-})();
+init();
 
 // Theme icon init
 (function() {
@@ -1268,7 +1180,7 @@ async function submitPin() {
 })();
 
 // Auto-refresh every 60s
-setInterval(() => { if (document.getElementById('dashboard').style.display !== 'none') loadData(); }, 60_000);
+setInterval(loadData, 60_000);
 </script>
 </body>
 </html>
