@@ -379,37 +379,36 @@
       <div id="scrapeResult"></div>
     </div>
 
-    <!-- Adjust Rep Stats -->
+    <!-- Generate Report -->
     <div class="card">
-      <div class="card-title"><span class="icon">✂️</span> Adjust Rep Stats</div>
-      <p class="desc">Manually correct a rep's call count or talk time for a specific date (e.g. remove a bogus call).</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+      <div class="card-title"><span class="icon">📋</span> Generate Report</div>
+      <p class="desc">Select a rep and a date range to get a performance summary.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
         <div>
           <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Rep</label>
-          <select id="adjRep" class="date-sel" style="width:100%;padding:0.5rem 0.75rem">
+          <select id="rptRep" class="date-sel" style="width:100%;padding:0.5rem 0.75rem">
             <option value="">— select rep —</option>
           </select>
         </div>
         <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Date</label>
-          <input id="adjDate" type="date" class="date-sel" style="width:100%;padding:0.5rem 0.75rem" />
-        </div>
-        <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Talk Time Adjustment (seconds)</label>
-          <input id="adjMinutes" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem"
-                 placeholder="e.g. -1800 to deduct 30 min" step="1" value="-1800" />
-        </div>
-        <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Call Count Adjustment</label>
-          <input id="adjCalls" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem"
-                 placeholder="e.g. -1 to remove a call" step="1" value="-1" />
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Days to Include</label>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input id="rptDays" type="number" class="date-sel"
+                   style="width:5rem;padding:0.5rem 0.625rem;flex-shrink:0"
+                   value="30" min="1" max="90" />
+            <div class="tab-row">
+              <button class="tab-btn" onclick="setRptDays(7)">7</button>
+              <button class="tab-btn" onclick="setRptDays(14)">14</button>
+              <button class="tab-btn" onclick="setRptDays(30)">30</button>
+              <button class="tab-btn" onclick="setRptDays(90)">90</button>
+            </div>
+          </div>
         </div>
       </div>
-      <button class="btn btn-brand" id="adjBtn" onclick="doAdjust()">
-        <span class="spinner"></span>
-        <span class="btn-text">Apply Adjustment</span>
+      <button class="btn btn-brand" onclick="generateReport()">
+        <span class="btn-text">Generate Report</span>
       </button>
-      <div id="adjResult" style="margin-top:0.75rem;font-size:0.8rem;color:var(--sub);min-height:1.2em"></div>
+      <div id="reportOutput" style="margin-top:1rem"></div>
     </div>
 
     <!-- Access Links -->
@@ -487,38 +486,6 @@
       <div id="repAnalytics"></div>
     </div>
 
-    <!-- Generate Report -->
-    <div class="card">
-      <div class="card-title"><span class="icon">📋</span> Generate Report</div>
-      <p class="desc">Select a rep and a date range to see their daily call count and talk time.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
-        <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Rep</label>
-          <select id="rptRep" class="date-sel" style="width:100%;padding:0.5rem 0.75rem">
-            <option value="">— select rep —</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Days to Include</label>
-          <div style="display:flex;gap:0.5rem;align-items:center">
-            <input id="rptDays" type="number" class="date-sel"
-                   style="width:5rem;padding:0.5rem 0.625rem;flex-shrink:0"
-                   value="30" min="1" max="90" />
-            <div class="tab-row">
-              <button class="tab-btn" onclick="setRptDays(7)">7</button>
-              <button class="tab-btn" onclick="setRptDays(14)">14</button>
-              <button class="tab-btn" onclick="setRptDays(30)">30</button>
-              <button class="tab-btn" onclick="setRptDays(90)">90</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <button class="btn btn-brand" onclick="generateReport()">
-        <span class="btn-text">Generate Report</span>
-      </button>
-      <div id="reportOutput" style="margin-top:1rem"></div>
-    </div>
-
   </div>
 </div>
 
@@ -526,9 +493,10 @@
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-let DATA      = null;
-let dispOn    = true;
-let chartInst = null;
+let DATA          = null;
+let dispOn        = true;
+let chartInst     = null;
+let _rptSparkChart = null;
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -563,7 +531,6 @@ async function loadData() {
     updateStatus();
     rebuildChart();
     renderAnalytics();
-    populateAdjRepDropdown();
     populateRptRepDropdown();
   } catch(_) {}
 
@@ -645,64 +612,6 @@ async function doScrape() {
     }
   } catch(e) {
     res.textContent = 'Error: ' + e.message;
-  } finally {
-    btn.classList.remove('loading'); btn.disabled = false;
-  }
-}
-
-// ── Adjust Rep Stats ──────────────────────────────────────────────────────────
-function populateAdjRepDropdown() {
-  if (!DATA) return;
-  const sel = document.getElementById('adjRep');
-  const current = sel.value;
-  const names = [...new Set([
-    ...(DATA.today?.reps || []).map(r => r.name),
-    ...(DATA.history || []).flatMap(s => s.reps.map(r => r.name)),
-  ])].sort();
-  sel.innerHTML = '<option value="">— select rep —</option>' +
-    names.map(n => `<option value="${esc(n)}" ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
-  // Default date to today
-  if (!document.getElementById('adjDate').value) {
-    document.getElementById('adjDate').value = new Date().toISOString().slice(0, 10);
-  }
-}
-
-async function doAdjust() {
-  const rep     = document.getElementById('adjRep').value.trim();
-  const date    = document.getElementById('adjDate').value.trim();
-  const minutes = parseInt(document.getElementById('adjMinutes').value) || 0;
-  const calls   = parseInt(document.getElementById('adjCalls').value) || 0;
-  const res     = document.getElementById('adjResult');
-
-  if (!rep)  { res.textContent = 'Please select a rep.'; res.style.color = '#ef4444'; return; }
-  if (!date) { res.textContent = 'Please select a date.'; res.style.color = '#ef4444'; return; }
-  if (minutes === 0 && calls === 0) { res.textContent = 'No adjustment specified.'; res.style.color = '#ef4444'; return; }
-
-  const btn = document.getElementById('adjBtn');
-  btn.classList.add('loading'); btn.disabled = true;
-  res.textContent = 'Applying…'; res.style.color = 'var(--sub)';
-
-  try {
-    const r = await fetch('/api/adjust-rep', {
-      method: 'POST', headers: authHeaders(),
-      body: JSON.stringify({ rep, date, adjustSeconds: minutes, adjustCalls: calls }),
-    });
-    const d = await r.json();
-    if (d.ok) {
-      const talkPart  = minutes !== 0 ? `${minutes > 0 ? '+' : ''}${minutes}s talk` : '';
-      const callsPart = calls  !== 0 ? `${calls > 0 ? '+' : ''}${calls} call${Math.abs(calls) !== 1 ? 's' : ''}` : '';
-      const summary   = [talkPart, callsPart].filter(Boolean).join(', ');
-      showToast(`Adjusted ${rep}: ${summary}`, 'success');
-      res.textContent = `Done — applied ${summary} to ${rep} on ${date}.`;
-      res.style.color = '#10b981';
-      await loadData();
-    } else {
-      res.textContent = `Error: ${d.error || 'Unknown error'}`;
-      res.style.color = '#ef4444';
-    }
-  } catch(e) {
-    res.textContent = 'Network error: ' + e.message;
-    res.style.color = '#ef4444';
   } finally {
     btn.classList.remove('loading'); btn.disabled = false;
   }
@@ -1047,9 +956,9 @@ function renderAnalytics() {
 // ── Generate Report ───────────────────────────────────────────────────────────
 function populateRptRepDropdown() {
   if (!DATA) return;
-  const sel = document.getElementById('rptRep');
+  const sel     = document.getElementById('rptRep');
   const current = sel.value;
-  const names = [...new Set([
+  const names   = [...new Set([
     ...(DATA.today?.reps || []).map(r => r.name),
     ...(DATA.history || []).flatMap(s => s.reps.map(r => r.name)),
   ])].sort();
@@ -1059,6 +968,39 @@ function populateRptRepDropdown() {
 
 function setRptDays(n) {
   document.getElementById('rptDays').value = n;
+}
+
+function setRptView(v) {
+  document.getElementById('rptCardView').style.display  = v === 'card'  ? '' : 'none';
+  document.getElementById('rptTableView').style.display = v === 'table' ? '' : 'none';
+  document.getElementById('rptViewCard').classList.toggle('active',  v === 'card');
+  document.getElementById('rptViewTable').classList.toggle('active', v === 'table');
+  if (v === 'card') _drawRptSpark();
+}
+
+function _drawRptSpark() {
+  if (!window._rptData) return;
+  const { rows, color } = window._rptData;
+  const canvas = document.getElementById('rpt_spark');
+  if (!canvas) return;
+  if (_rptSparkChart) { _rptSparkChart.destroy(); _rptSparkChart = null; }
+  const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const vals   = sorted.map(d => d.calls);
+  const labels = sorted.map(d => new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+  _rptSparkChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ data: vals, borderColor: color, backgroundColor: color + '22',
+                   borderWidth: 2, pointRadius: 2, tension: 0.4, fill: true }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
+      animation: false,
+    },
+  });
 }
 
 function generateReport() {
@@ -1075,9 +1017,8 @@ function generateReport() {
     return;
   }
 
-  // Sort ascending, take the last N days, filter to rows for this rep
   const sorted = [...DATA.history].sort((a, b) => a.date.localeCompare(b.date)).slice(-days);
-  const rows = sorted.map(snap => {
+  const rows   = sorted.map(snap => {
     const r = snap.reps.find(r => r.name === rep);
     return { date: snap.date, calls: r?.totalCalls ?? 0, talkSec: r?.totalTalkTimeSec ?? 0 };
   }).filter(r => r.calls > 0 || r.talkSec > 0);
@@ -1087,18 +1028,51 @@ function generateReport() {
     return;
   }
 
-  const totalCalls = rows.reduce((a, r) => a + r.calls, 0);
-  const totalTalk  = rows.reduce((a, r) => a + r.talkSec, 0);
-  const avgCalls   = (totalCalls / rows.length).toFixed(1);
-  const avgTalk    = fmtSec(Math.round(totalTalk / rows.length));
-
   const allReps = [...new Set([
     ...(DATA.today?.reps || []).map(r => r.name),
     ...(DATA.history || []).flatMap(s => s.reps.map(r => r.name)),
   ])].sort();
   const color = repColor(rep, allReps);
 
-  // Display newest first
+  const n          = rows.length;
+  const totalCalls = rows.reduce((a, r) => a + r.calls, 0);
+  const totalTalk  = rows.reduce((a, r) => a + r.talkSec, 0);
+  const avgCalls   = (totalCalls / n).toFixed(1);
+  const avgTalkDay = fmtSec(Math.round(totalTalk / n));
+  const avgTalkCall = totalCalls ? fmtSec(Math.round(totalTalk / totalCalls)) : '—';
+
+  const asc     = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const bestDay = asc.reduce((best, d) => d.calls > best.calls ? d : best, asc[0]);
+  const lowDay  = asc.reduce((low,  d) => d.calls < low.calls  ? d : low,  asc[0]);
+
+  function fmtDate(ds) {
+    return new Date(ds + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  // Trend: second half vs first half
+  const half = Math.floor(n / 2);
+  let trendHtml = '';
+  if (half > 0) {
+    const first  = asc.slice(0, half).reduce((a, d) => a + d.calls, 0) / half;
+    const second = asc.slice(half).reduce((a, d) => a + d.calls, 0) / (n - half);
+    const pct    = first > 0 ? Math.round(((second - first) / first) * 100) : 0;
+    if (pct !== 0) {
+      trendHtml = `<span class="${pct > 0 ? 'trend-up' : 'trend-down'}">${pct > 0 ? '▲' : '▼'}${Math.abs(pct)}%</span>`;
+    }
+  }
+
+  // Last 5 day boxes
+  const last5   = asc.slice(-5);
+  const dayAbbr = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const dayBoxes = last5.map(d => {
+    const dow = dayAbbr[new Date(d.date + 'T12:00:00').getDay()];
+    return `<div class="day-box" style="border-top:2px solid ${color}">
+      <div class="db-label">${dow}</div>
+      <div class="db-val" style="color:${color}">${d.calls}</div>
+    </div>`;
+  }).join('');
+
+  // Table rows (newest first)
   const tableRows = [...rows].reverse().map(r => {
     const dt      = new Date(r.date + 'T12:00:00');
     const dateFmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -1109,81 +1083,110 @@ function generateReport() {
     </tr>`;
   }).join('');
 
+  if (_rptSparkChart) { _rptSparkChart.destroy(); _rptSparkChart = null; }
+
   out.innerHTML = `
-    <div class="report-wrap">
-      <div class="report-banner" style="border-top:3px solid ${color}">
-        <div class="report-banner-left">
+    <div class="analytics-rep">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <div class="analytics-rep-header" style="margin-bottom:0">
           <div class="rep-avatar" style="background:${color}">${initials(rep)}</div>
           <div>
-            <div class="report-rep-name">${esc(rep)}</div>
-            <div class="report-rep-sub">${rows[rows.length-1].date} ← ${rows[0].date} &nbsp;·&nbsp; ${rows.length} day${rows.length !== 1 ? 's' : ''} with activity</div>
+            <div class="rep-full-name">${esc(rep)}</div>
+            <div class="rep-meta">${n} day${n !== 1 ? 's' : ''} of data</div>
           </div>
         </div>
-        <button class="copy-btn" onclick="exportReportCSV()">Export CSV</button>
-      </div>
-      <div class="report-pills">
-        <div class="report-pill">
-          <div class="rpl">Total Calls</div>
-          <div class="rpv" style="color:${color}">${totalCalls}</div>
-        </div>
-        <div class="report-pill">
-          <div class="rpl">Total Talk Time</div>
-          <div class="rpv">${fmtSec(totalTalk)}</div>
-        </div>
-        <div class="report-pill">
-          <div class="rpl">Avg Calls / Day</div>
-          <div class="rpv">${avgCalls}</div>
-        </div>
-        <div class="report-pill">
-          <div class="rpl">Avg Talk / Day</div>
-          <div class="rpv">${avgTalk}</div>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <div class="tab-row">
+            <button class="tab-btn active" id="rptViewCard"  onclick="setRptView('card')">Card</button>
+            <button class="tab-btn"        id="rptViewTable" onclick="setRptView('table')">Table</button>
+          </div>
+          <button class="copy-btn" onclick="exportReportCSV()">Export CSV</button>
         </div>
       </div>
-      <div class="report-scroll">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th style="text-align:right">Calls</th>
-              <th>Talk Time</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td>
-              <td class="calls-val" style="text-align:right">${totalCalls}</td>
-              <td style="font-variant-numeric:tabular-nums">${fmtSec(totalTalk)}</td>
-            </tr>
-            <tr>
-              <td>Daily Average</td>
-              <td class="calls-val" style="text-align:right">${avgCalls}</td>
-              <td>${avgTalk}</td>
-            </tr>
-          </tfoot>
-        </table>
+
+      <div id="rptCardView">
+        <div class="rep-stats-grid">
+          <div class="rep-stat">
+            <div class="sl">Avg Calls / Day</div>
+            <div class="sv">${avgCalls} ${trendHtml}</div>
+            <div class="ss">per working day</div>
+          </div>
+          <div class="rep-stat">
+            <div class="sl">Avg Talk / Day</div>
+            <div class="sv">${avgTalkDay}</div>
+            <div class="ss">per working day</div>
+          </div>
+          <div class="rep-stat">
+            <div class="sl">Avg Talk / Call</div>
+            <div class="sv">${avgTalkCall}</div>
+            <div class="ss">${totalCalls} total calls</div>
+          </div>
+          <div class="rep-stat">
+            <div class="sl">Best Day</div>
+            <div class="sv">${bestDay.calls}</div>
+            <div class="ss">${fmtDate(bestDay.date)}</div>
+          </div>
+          <div class="rep-stat">
+            <div class="sl">Lowest Day</div>
+            <div class="sv">${lowDay.calls}</div>
+            <div class="ss">${fmtDate(lowDay.date)}</div>
+          </div>
+        </div>
+        <div class="rep-bottom">
+          <div class="rep-sparkline"><canvas id="rpt_spark"></canvas></div>
+          <div>
+            <div class="day-box-header">CALLS BY DAY (LAST ${last5.length})</div>
+            <div class="day-boxes">${dayBoxes}</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="rptTableView" style="display:none">
+        <div class="report-scroll">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th style="text-align:right">Calls</th>
+                <th>Talk Time</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td class="calls-val" style="text-align:right">${totalCalls}</td>
+                <td style="font-variant-numeric:tabular-nums">${fmtSec(totalTalk)}</td>
+              </tr>
+              <tr>
+                <td>Daily Average</td>
+                <td class="calls-val" style="text-align:right">${avgCalls}</td>
+                <td>${avgTalkDay}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
     </div>`;
 
-  // Stash for CSV export (ascending order)
-  window._rptData = { rep, rows };
+  window._rptData = { rep, rows, color };
+  requestAnimationFrame(_drawRptSpark);
 }
 
 function exportReportCSV() {
   if (!window._rptData) return;
   const { rep, rows } = window._rptData;
   const lines = ['Date,Total Calls,Talk Time Seconds,Talk Time'];
-  for (const r of rows) {
+  for (const r of [...rows].sort((a, b) => a.date.localeCompare(b.date))) {
     lines.push(`${r.date},${r.calls},${r.talkSec},${fmtSec(r.talkSec)}`);
   }
   const totalCalls = rows.reduce((a, r) => a + r.calls, 0);
   const totalTalk  = rows.reduce((a, r) => a + r.talkSec, 0);
   lines.push(`TOTAL,${totalCalls},${totalTalk},${fmtSec(totalTalk)}`);
-
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href     = url;
+  a.href = url;
   a.download = `report_${rep.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
