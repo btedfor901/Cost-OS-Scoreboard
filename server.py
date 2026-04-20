@@ -147,7 +147,7 @@ def verify_pin():
         return jsonify({"ok": False, "error": "too many attempts"}), 429
     if not _pin_ok():
         return jsonify({"ok": False}), 401
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "displayOn": _display_on})
 
 
 @app.route("/api/display-status")

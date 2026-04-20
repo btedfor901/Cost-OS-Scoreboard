@@ -445,6 +445,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// Mark this browser session as admin so the scoreboard page shows even when hidden
+sessionStorage.setItem('ca', '1');
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let DATA          = null;
 let dispOn        = true;
