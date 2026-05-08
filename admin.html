@@ -532,6 +532,8 @@ async function loadData() {
     rebuildChart();
     renderAnalytics();
     populateRptRepDropdown();
+    populateAdjustmentDateDropdown();
+    updateAdjustmentStats();
   } catch(_) {}
 
   try {
@@ -979,44 +981,32 @@ function populateRptRepDropdown() {
 
 // ── Adjustment helpers ────────────────────────────────────────────────────────
 function populateAdjustmentDateDropdown() {
-  if (!DATA || !DATA.history) {
-    document.getElementById('adjDate').innerHTML = '<option value="">— load data first —</option>';
-    return;
-  }
+  if (!DATA) return;
 
-  // Simply populate all available dates from history
-  const dates = [];
   const todayStr = new Date().toISOString().slice(0, 10);
+  const dates = new Set();
   
-  // Add today if we have data
-  if (DATA.today && DATA.today.reps && DATA.today.reps.length > 0) {
-    dates.push(todayStr);
-  }
+  // ALWAYS add today
+  dates.add(todayStr);
   
   // Add all history dates
   if (DATA.history && Array.isArray(DATA.history)) {
     for (const snap of DATA.history) {
-      if (snap.date && snap.reps && snap.reps.length > 0) {
-        dates.push(snap.date);
+      if (snap.date) {
+        dates.add(snap.date);
       }
     }
   }
 
-  const uniqueDates = [...new Set(dates)].sort().reverse();
-  
+  const uniqueDates = [...dates].sort().reverse();
   const adjDate = document.getElementById('adjDate');
-  if (uniqueDates.length === 0) {
-    adjDate.innerHTML = '<option value="">— no dates available —</option>';
-    return;
-  }
-
-  adjDate.innerHTML = '<option value="">— select date —</option>' +
-    uniqueDates.map(d => {
-      const dt = new Date(d + 'T12:00:00');
-      const fmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: '2-digit' });
-      const label = d === todayStr ? `${fmt} (Today)` : fmt;
-      return `<option value="${d}">${label}</option>`;
-    }).join('');
+  
+  adjDate.innerHTML = uniqueDates.map(d => {
+    const dt = new Date(d + 'T12:00:00');
+    const fmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: '2-digit' });
+    const label = d === todayStr ? `${fmt} (Today)` : fmt;
+    return `<option value="${d}" ${d === todayStr ? 'selected' : ''}>${label}</option>`;
+  }).join('');
 }
 
 function updateAdjustmentStats() {
@@ -1024,11 +1014,6 @@ function updateAdjustmentStats() {
   const date = document.getElementById('adjDate').value;
   const currentEl = document.getElementById('adjCurrent');
   const previewEl = document.getElementById('adjPreview');
-  
-  // Always try to populate dates when rep changes
-  if (rep) {
-    populateAdjustmentDateDropdown();
-  }
   
   if (!rep || !date) {
     currentEl.textContent = '—';
