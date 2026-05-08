@@ -976,12 +976,16 @@ function populateRptRepDropdown() {
 
 // ── Adjustment helpers ────────────────────────────────────────────────────────
 function populateAdjustmentDateDropdown() {
-  if (!DATA) return;
+  if (!DATA || !DATA.history) {
+    document.getElementById('adjDate').innerHTML = '<option value="">— no data available —</option>';
+    return;
+  }
+  
   const rep = document.getElementById('adjRep').value;
   const adjDate = document.getElementById('adjDate');
   
   if (!rep) {
-    adjDate.innerHTML = '<option value="">— select date —</option>';
+    adjDate.innerHTML = '<option value="">— select rep first —</option>';
     return;
   }
 
@@ -989,15 +993,30 @@ function populateAdjustmentDateDropdown() {
   const dates = new Set();
   const todayStr = new Date().toISOString().slice(0, 10);
   
-  if (DATA.today?.reps?.some(r => r.name === rep)) {
-    dates.add(todayStr);
+  // Check today
+  if (DATA.today?.reps) {
+    for (const r of DATA.today.reps) {
+      if (r.name === rep && r.totalCalls > 0) {
+        dates.add(todayStr);
+        break;
+      }
+    }
   }
   
-  DATA.history?.forEach(snap => {
-    if (snap.reps.some(r => r.name === rep)) {
-      dates.add(snap.date);
+  // Check history
+  for (const snap of (DATA.history || [])) {
+    for (const r of snap.reps) {
+      if (r.name === rep && r.totalCalls > 0) {
+        dates.add(snap.date);
+        break;
+      }
     }
-  });
+  }
+
+  if (dates.size === 0) {
+    adjDate.innerHTML = '<option value="">— no dates found for this rep —</option>';
+    return;
+  }
 
   const sortedDates = [...dates].sort().reverse();
   adjDate.innerHTML = '<option value="">— select date —</option>' +
@@ -1014,24 +1033,28 @@ function updateAdjustmentStats() {
   const date = document.getElementById('adjDate').value;
   const currentEl = document.getElementById('adjCurrent');
   const previewEl = document.getElementById('adjPreview');
-  const targetEl = document.getElementById('adjTarget');
+  const btn = document.getElementById('adjBtn');
   
   populateAdjustmentDateDropdown();
   
   if (!rep || !date) {
     currentEl.textContent = '—';
     previewEl.textContent = '—';
+    previewEl.style.color = 'var(--sub)';
+    btn.disabled = true;
     return;
   }
+
+  btn.disabled = false;
 
   // Find current talk time
   let currentAvgTalk = null;
   const todayStr = new Date().toISOString().slice(0, 10);
   
-  if (date === todayStr && DATA.today?.reps) {
+  if (date === todayStr && DATA?.today?.reps) {
     const r = DATA.today.reps.find(x => x.name === rep);
     if (r) currentAvgTalk = r.avgTalkTimeSec;
-  } else if (DATA.history) {
+  } else if (DATA?.history) {
     const snap = DATA.history.find(s => s.date === date);
     if (snap) {
       const r = snap.reps.find(x => x.name === rep);
@@ -1113,8 +1136,19 @@ async function applyAdjustment() {
   const btn = document.getElementById('adjBtn');
   const resultEl = document.getElementById('adjResult');
 
-  if (!rep || !date || isNaN(target) || target < 1) {
-    resultEl.textContent = 'Please fill all fields with valid values.';
+  // Validate inputs
+  if (!rep) {
+    resultEl.textContent = '❌ Please select a rep.';
+    resultEl.style.color = '#ef4444';
+    return;
+  }
+  if (!date) {
+    resultEl.textContent = '❌ Please select a date.';
+    resultEl.style.color = '#ef4444';
+    return;
+  }
+  if (!document.getElementById('adjTarget').value || isNaN(target) || target < 1) {
+    resultEl.textContent = '❌ Please enter a valid target time (in seconds).';
     resultEl.style.color = '#ef4444';
     return;
   }
@@ -1124,10 +1158,10 @@ async function applyAdjustment() {
   let currentAvgTalk = null;
   let totalCalls = null;
 
-  if (date === todayStr && DATA.today?.reps) {
+  if (date === todayStr && DATA?.today?.reps) {
     const r = DATA.today.reps.find(x => x.name === rep);
     if (r) { currentAvgTalk = r.avgTalkTimeSec; totalCalls = r.totalCalls; }
-  } else if (DATA.history) {
+  } else if (DATA?.history) {
     const snap = DATA.history.find(s => s.date === date);
     if (snap) {
       const r = snap.reps.find(x => x.name === rep);
@@ -1136,7 +1170,7 @@ async function applyAdjustment() {
   }
 
   if (currentAvgTalk === null || totalCalls === null || totalCalls === 0) {
-    resultEl.textContent = 'Rep/date not found in data.';
+    resultEl.textContent = '❌ Rep/date not found in data or has no calls.';
     resultEl.style.color = '#ef4444';
     return;
   }
@@ -1145,7 +1179,7 @@ async function applyAdjustment() {
 
   btn.classList.add('loading');
   btn.disabled = true;
-  resultEl.textContent = 'Applying adjustment...';
+  resultEl.textContent = '⏳ Applying adjustment...';
   resultEl.style.color = 'var(--sub)';
 
   try {
@@ -1162,16 +1196,19 @@ async function applyAdjustment() {
 
     const d = await r.json();
     
-    if (!r.ok || !d.ok) {
-      resultEl.textContent = `Error: ${d.error || 'Failed to apply adjustment'}`;
+    if (!r.ok) {
+      resultEl.textContent = `❌ ${d.error || 'Failed to apply adjustment'}`;
+      resultEl.style.color = '#ef4444';
+    } else if (!d.ok) {
+      resultEl.textContent = `❌ ${d.error || 'Failed to apply adjustment'}`;
       resultEl.style.color = '#ef4444';
     } else {
-      resultEl.textContent = `✓ Adjustment applied! ${rep}'s average talk time changed from ${currentAvgTalk}s to ${target}s on ${date}.`;
+      resultEl.textContent = `✅ Success! ${rep}'s avg talk time changed from ${currentAvgTalk}s to ${target}s on ${date}. Reloading data...`;
       resultEl.style.color = '#10b981';
       setTimeout(() => { loadData(); resetAdjustmentForm(); }, 1500);
     }
   } catch (e) {
-    resultEl.textContent = `Error: ${e.message}`;
+    resultEl.textContent = `❌ Error: ${e.message}`;
     resultEl.style.color = '#ef4444';
   } finally {
     btn.classList.remove('loading');
