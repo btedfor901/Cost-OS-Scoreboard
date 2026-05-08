@@ -972,57 +972,48 @@ function populateRptRepDropdown() {
     adjSel.innerHTML = '<option value="">— select rep —</option>' +
       names.map(n => `<option value="${esc(n)}" ${n === adjCurrent ? 'selected' : ''}>${esc(n)}</option>`).join('');
   }
+
+  // Populate dates in adjustment form
+  populateAdjustmentDateDropdown();
 }
 
 // ── Adjustment helpers ────────────────────────────────────────────────────────
 function populateAdjustmentDateDropdown() {
   if (!DATA || !DATA.history) {
-    document.getElementById('adjDate').innerHTML = '<option value="">— no data available —</option>';
-    return;
-  }
-  
-  const rep = document.getElementById('adjRep').value;
-  const adjDate = document.getElementById('adjDate');
-  
-  if (!rep) {
-    adjDate.innerHTML = '<option value="">— select rep first —</option>';
+    document.getElementById('adjDate').innerHTML = '<option value="">— load data first —</option>';
     return;
   }
 
-  // Get all dates where this rep has data
-  const dates = new Set();
+  // Simply populate all available dates from history
+  const dates = [];
   const todayStr = new Date().toISOString().slice(0, 10);
   
-  // Check today
-  if (DATA.today?.reps) {
-    for (const r of DATA.today.reps) {
-      if (r.name === rep && r.totalCalls > 0) {
-        dates.add(todayStr);
-        break;
-      }
-    }
+  // Add today if we have data
+  if (DATA.today && DATA.today.reps && DATA.today.reps.length > 0) {
+    dates.push(todayStr);
   }
   
-  // Check history
-  for (const snap of (DATA.history || [])) {
-    for (const r of snap.reps) {
-      if (r.name === rep && r.totalCalls > 0) {
-        dates.add(snap.date);
-        break;
+  // Add all history dates
+  if (DATA.history && Array.isArray(DATA.history)) {
+    for (const snap of DATA.history) {
+      if (snap.date && snap.reps && snap.reps.length > 0) {
+        dates.push(snap.date);
       }
     }
   }
 
-  if (dates.size === 0) {
-    adjDate.innerHTML = '<option value="">— no dates found for this rep —</option>';
+  const uniqueDates = [...new Set(dates)].sort().reverse();
+  
+  const adjDate = document.getElementById('adjDate');
+  if (uniqueDates.length === 0) {
+    adjDate.innerHTML = '<option value="">— no dates available —</option>';
     return;
   }
 
-  const sortedDates = [...dates].sort().reverse();
   adjDate.innerHTML = '<option value="">— select date —</option>' +
-    sortedDates.map(d => {
+    uniqueDates.map(d => {
       const dt = new Date(d + 'T12:00:00');
-      const fmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const fmt = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: '2-digit' });
       const label = d === todayStr ? `${fmt} (Today)` : fmt;
       return `<option value="${d}">${label}</option>`;
     }).join('');
@@ -1033,19 +1024,18 @@ function updateAdjustmentStats() {
   const date = document.getElementById('adjDate').value;
   const currentEl = document.getElementById('adjCurrent');
   const previewEl = document.getElementById('adjPreview');
-  const btn = document.getElementById('adjBtn');
   
-  populateAdjustmentDateDropdown();
+  // Always try to populate dates when rep changes
+  if (rep) {
+    populateAdjustmentDateDropdown();
+  }
   
   if (!rep || !date) {
     currentEl.textContent = '—';
     previewEl.textContent = '—';
     previewEl.style.color = 'var(--sub)';
-    btn.disabled = true;
     return;
   }
-
-  btn.disabled = false;
 
   // Find current talk time
   let currentAvgTalk = null;
