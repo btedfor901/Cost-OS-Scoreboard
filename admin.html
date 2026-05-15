@@ -367,8 +367,8 @@
     <!-- Adjust Rep Stats -->
     <div class="card">
       <div class="card-title"><span class="icon">⚙️</span> Adjust Rep Stats</div>
-      <p class="desc">Manually adjust average talk time or other metrics for a specific rep and date.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
+      <p class="desc">Manually add or remove calls, or adjust average talk time for a specific rep and date.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
         <div>
           <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Rep</label>
           <select id="adjRep" class="date-sel" style="width:100%;padding:0.5rem 0.75rem" onchange="updateAdjustmentStats()">
@@ -381,6 +381,12 @@
             <option value="">— select date —</option>
           </select>
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
+        <div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Current Calls</label>
+          <div id="adjCurrentCalls" style="padding:0.5rem 0.75rem;background:var(--raised);border:1px solid var(--divider);border-radius:0.5rem;font-size:0.85rem;font-weight:600">—</div>
+        </div>
         <div>
           <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Current Avg Talk Time</label>
           <div id="adjCurrent" style="padding:0.5rem 0.75rem;background:var(--raised);border:1px solid var(--divider);border-radius:0.5rem;font-size:0.85rem;font-weight:600">—</div>
@@ -388,15 +394,17 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.875rem">
         <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Target Avg Talk Time (seconds)</label>
-          <div style="display:flex;gap:0.5rem">
-            <input id="adjTarget" type="number" class="date-sel" style="flex:1;padding:0.5rem 0.75rem" placeholder="e.g. 35" min="1" />
-          </div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Call Adjustment (+/−)</label>
+          <input id="adjCallDelta" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem" placeholder="e.g. +1 or -2" />
         </div>
         <div>
-          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Adjustment Preview</label>
-          <div id="adjPreview" style="padding:0.5rem 0.75rem;background:var(--raised);border:1px solid var(--divider);border-radius:0.5rem;font-size:0.85rem;font-weight:600">—</div>
+          <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Target Avg Talk Time (seconds)</label>
+          <input id="adjTarget" type="number" class="date-sel" style="width:100%;padding:0.5rem 0.75rem" placeholder="e.g. 35" min="1" />
         </div>
+      </div>
+      <div style="margin-bottom:0.875rem">
+        <label style="font-size:0.75rem;font-weight:600;color:var(--sub);display:block;margin-bottom:0.3rem">Adjustment Preview</label>
+        <div id="adjPreview" style="padding:0.5rem 0.75rem;background:var(--raised);border:1px solid var(--divider);border-radius:0.5rem;font-size:0.85rem;font-weight:600">—</div>
       </div>
       <div style="display:flex;gap:0.75rem">
         <button class="btn btn-brand" id="adjBtn" onclick="applyAdjustment()" style="flex:1">
@@ -1013,84 +1021,80 @@ function updateAdjustmentStats() {
   const rep = document.getElementById('adjRep').value;
   const date = document.getElementById('adjDate').value;
   const currentEl = document.getElementById('adjCurrent');
+  const currentCallsEl = document.getElementById('adjCurrentCalls');
   const previewEl = document.getElementById('adjPreview');
-  
+
   if (!rep || !date) {
     currentEl.textContent = '—';
+    currentCallsEl.textContent = '—';
     previewEl.textContent = '—';
     previewEl.style.color = 'var(--sub)';
     return;
   }
 
-  // Find current talk time
   let currentAvgTalk = null;
+  let currentCalls = null;
   const todayStr = new Date().toISOString().slice(0, 10);
-  
+
   if (date === todayStr && DATA?.today?.reps) {
     const r = DATA.today.reps.find(x => x.name === rep);
-    if (r) currentAvgTalk = r.avgTalkTimeSec;
+    if (r) { currentAvgTalk = r.avgTalkTimeSec; currentCalls = r.totalCalls; }
   } else if (DATA?.history) {
     const snap = DATA.history.find(s => s.date === date);
     if (snap) {
       const r = snap.reps.find(x => x.name === rep);
-      if (r) currentAvgTalk = r.avgTalkTimeSec;
+      if (r) { currentAvgTalk = r.avgTalkTimeSec; currentCalls = r.totalCalls; }
     }
   }
 
-  if (currentAvgTalk !== null) {
-    currentEl.textContent = `${currentAvgTalk} sec`;
-  } else {
-    currentEl.textContent = '—';
-  }
+  currentEl.textContent = currentAvgTalk !== null ? `${currentAvgTalk} sec` : '—';
+  currentCallsEl.textContent = currentCalls !== null ? currentCalls : '—';
 
-  // Update preview
-  updateAdjustmentPreview(rep, date, currentAvgTalk);
+  updateAdjustmentPreview(rep, date, currentAvgTalk, currentCalls);
 }
 
-function updateAdjustmentPreview(rep, date, currentAvgTalk) {
+function updateAdjustmentPreview(rep, date, currentAvgTalk, currentCalls) {
   const targetEl = document.getElementById('adjTarget');
+  const callDeltaEl = document.getElementById('adjCallDelta');
   const previewEl = document.getElementById('adjPreview');
-  
+
   const target = parseInt(targetEl.value);
-  
-  if (currentAvgTalk === null || isNaN(target)) {
+  const callDelta = parseInt(callDeltaEl.value);
+  const hasCallDelta = callDeltaEl.value.trim() !== '' && !isNaN(callDelta) && callDelta !== 0;
+  const hasTalkTarget = targetEl.value.trim() !== '' && !isNaN(target) && target >= 1;
+
+  if (!hasCallDelta && !hasTalkTarget) {
     previewEl.textContent = '—';
+    previewEl.style.color = 'var(--sub)';
     return;
   }
 
-  // Find total calls for this rep/date to calculate adjustment
-  const todayStr = new Date().toISOString().slice(0, 10);
-  let totalCalls = null;
-  
-  if (date === todayStr && DATA.today?.reps) {
-    const r = DATA.today.reps.find(x => x.name === rep);
-    if (r) totalCalls = r.totalCalls;
-  } else if (DATA.history) {
-    const snap = DATA.history.find(s => s.date === date);
-    if (snap) {
-      const r = snap.reps.find(x => x.name === rep);
-      if (r) totalCalls = r.totalCalls;
+  const parts = [];
+
+  if (hasCallDelta) {
+    const sign = callDelta > 0 ? '+' : '';
+    parts.push(`${sign}${callDelta} call${Math.abs(callDelta) !== 1 ? 's' : ''}`);
+  }
+
+  if (hasTalkTarget && currentAvgTalk !== null && currentCalls !== null && currentCalls > 0) {
+    const effectiveCalls = currentCalls + (hasCallDelta ? callDelta : 0);
+    if (effectiveCalls > 0) {
+      const adjustmentSec = Math.round(target * effectiveCalls - currentAvgTalk * currentCalls);
+      if (adjustmentSec !== 0) {
+        const sign = adjustmentSec > 0 ? '+' : '';
+        parts.push(`${sign}${adjustmentSec}s talk time → avg ${target}s`);
+      } else {
+        parts.push(`no talk time change`);
+      }
     }
   }
 
-  if (totalCalls === null || totalCalls === 0) {
-    previewEl.textContent = '—';
-    return;
-  }
-
-  // Calculate adjustment needed
-  const currentTotal = currentAvgTalk * totalCalls;
-  const targetTotal = target * totalCalls;
-  const adjustmentSec = Math.round(targetTotal - currentTotal);
-
-  if (adjustmentSec === 0) {
-    previewEl.textContent = 'No change needed';
-  } else if (adjustmentSec > 0) {
-    previewEl.textContent = `+${adjustmentSec} sec (+${fmtSec(adjustmentSec)})`;
-    previewEl.style.color = '#10b981';
+  if (parts.length === 0) {
+    previewEl.textContent = 'No change';
+    previewEl.style.color = 'var(--sub)';
   } else {
-    previewEl.textContent = `${adjustmentSec} sec (${fmtSec(adjustmentSec)})`;
-    previewEl.style.color = '#ef4444';
+    previewEl.textContent = parts.join('  |  ');
+    previewEl.style.color = hasCallDelta && callDelta < 0 ? '#ef4444' : '#10b981';
   }
 }
 
@@ -1098,7 +1102,9 @@ function resetAdjustmentForm() {
   document.getElementById('adjRep').value = '';
   document.getElementById('adjDate').value = '';
   document.getElementById('adjTarget').value = '';
+  document.getElementById('adjCallDelta').value = '';
   document.getElementById('adjCurrent').textContent = '—';
+  document.getElementById('adjCurrentCalls').textContent = '—';
   document.getElementById('adjPreview').textContent = '—';
   document.getElementById('adjResult').textContent = '';
   document.getElementById('adjPreview').style.color = 'var(--sub)';
@@ -1107,11 +1113,15 @@ function resetAdjustmentForm() {
 async function applyAdjustment() {
   const rep = document.getElementById('adjRep').value.trim();
   const date = document.getElementById('adjDate').value.trim();
-  const target = parseInt(document.getElementById('adjTarget').value);
+  const targetVal = document.getElementById('adjTarget').value.trim();
+  const callDeltaVal = document.getElementById('adjCallDelta').value.trim();
+  const target = parseInt(targetVal);
+  const callDelta = parseInt(callDeltaVal);
+  const hasCallDelta = callDeltaVal !== '' && !isNaN(callDelta) && callDelta !== 0;
+  const hasTalkTarget = targetVal !== '' && !isNaN(target) && target >= 1;
   const btn = document.getElementById('adjBtn');
   const resultEl = document.getElementById('adjResult');
 
-  // Validate inputs
   if (!rep) {
     resultEl.textContent = '❌ Please select a rep.';
     resultEl.style.color = '#ef4444';
@@ -1122,13 +1132,12 @@ async function applyAdjustment() {
     resultEl.style.color = '#ef4444';
     return;
   }
-  if (!document.getElementById('adjTarget').value || isNaN(target) || target < 1) {
-    resultEl.textContent = '❌ Please enter a valid target time (in seconds).';
+  if (!hasCallDelta && !hasTalkTarget) {
+    resultEl.textContent = '❌ Enter a call adjustment (+/−) or a target talk time.';
     resultEl.style.color = '#ef4444';
     return;
   }
 
-  // Find current avg talk and total calls
   const todayStr = new Date().toISOString().slice(0, 10);
   let currentAvgTalk = null;
   let totalCalls = null;
@@ -1144,13 +1153,21 @@ async function applyAdjustment() {
     }
   }
 
-  if (currentAvgTalk === null || totalCalls === null || totalCalls === 0) {
-    resultEl.textContent = '❌ Rep/date not found in data or has no calls.';
+  if (currentAvgTalk === null || totalCalls === null) {
+    resultEl.textContent = '❌ Rep/date not found in data.';
     resultEl.style.color = '#ef4444';
     return;
   }
 
-  const adjustmentSec = Math.round((target - currentAvgTalk) * totalCalls);
+  let adjustCalls = hasCallDelta ? callDelta : 0;
+  let adjustmentSec = 0;
+
+  if (hasTalkTarget && totalCalls > 0) {
+    const effectiveCalls = totalCalls + adjustCalls;
+    if (effectiveCalls > 0) {
+      adjustmentSec = Math.round(target * effectiveCalls - currentAvgTalk * totalCalls);
+    }
+  }
 
   btn.classList.add('loading');
   btn.disabled = true;
@@ -1161,24 +1178,19 @@ async function applyAdjustment() {
     const r = await fetch('/api/adjust-rep', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({
-        rep,
-        date,
-        adjustSeconds: adjustmentSec,
-        adjustCalls: 0,
-      }),
+      body: JSON.stringify({ rep, date, adjustSeconds: adjustmentSec, adjustCalls }),
     });
 
     const d = await r.json();
-    
-    if (!r.ok) {
-      resultEl.textContent = `❌ ${d.error || 'Failed to apply adjustment'}`;
-      resultEl.style.color = '#ef4444';
-    } else if (!d.ok) {
+
+    if (!r.ok || !d.ok) {
       resultEl.textContent = `❌ ${d.error || 'Failed to apply adjustment'}`;
       resultEl.style.color = '#ef4444';
     } else {
-      resultEl.textContent = `✅ Success! ${rep}'s avg talk time changed from ${currentAvgTalk}s to ${target}s on ${date}. Reloading data...`;
+      const callMsg = hasCallDelta ? `calls ${callDelta > 0 ? '+' : ''}${callDelta}` : '';
+      const talkMsg = hasTalkTarget ? `avg talk → ${target}s` : '';
+      const summary = [callMsg, talkMsg].filter(Boolean).join(', ');
+      resultEl.textContent = `✅ Done! ${rep} on ${date}: ${summary}. Reloading data...`;
       resultEl.style.color = '#10b981';
       setTimeout(() => { loadData(); resetAdjustmentForm(); }, 1500);
     }
@@ -1191,31 +1203,33 @@ async function applyAdjustment() {
   }
 }
 
-// Update adjustment preview whenever target changes
+// Update adjustment preview whenever target or call delta changes
 function initAdjustmentHandlers() {
-  const targetEl = document.getElementById('adjTarget');
-  if (targetEl) {
-    targetEl.addEventListener('input', () => {
-      const rep = document.getElementById('adjRep').value;
-      const date = document.getElementById('adjDate').value;
-      const todayStr = new Date().toISOString().slice(0, 10);
-      let currentAvgTalk = null;
+  function onAdjInput() {
+    const rep = document.getElementById('adjRep').value;
+    const date = document.getElementById('adjDate').value;
+    if (!rep || !date) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let currentAvgTalk = null;
+    let currentCalls = null;
 
-      if (rep && date) {
-        if (date === todayStr && DATA.today?.reps) {
-          const r = DATA.today.reps.find(x => x.name === rep);
-          if (r) currentAvgTalk = r.avgTalkTimeSec;
-        } else if (DATA.history) {
-          const snap = DATA.history.find(s => s.date === date);
-          if (snap) {
-            const r = snap.reps.find(x => x.name === rep);
-            if (r) currentAvgTalk = r.avgTalkTimeSec;
-          }
-        }
-        updateAdjustmentPreview(rep, date, currentAvgTalk);
+    if (date === todayStr && DATA.today?.reps) {
+      const r = DATA.today.reps.find(x => x.name === rep);
+      if (r) { currentAvgTalk = r.avgTalkTimeSec; currentCalls = r.totalCalls; }
+    } else if (DATA.history) {
+      const snap = DATA.history.find(s => s.date === date);
+      if (snap) {
+        const r = snap.reps.find(x => x.name === rep);
+        if (r) { currentAvgTalk = r.avgTalkTimeSec; currentCalls = r.totalCalls; }
       }
-    });
+    }
+    updateAdjustmentPreview(rep, date, currentAvgTalk, currentCalls);
   }
+
+  const targetEl = document.getElementById('adjTarget');
+  const callDeltaEl = document.getElementById('adjCallDelta');
+  if (targetEl) targetEl.addEventListener('input', onAdjInput);
+  if (callDeltaEl) callDeltaEl.addEventListener('input', onAdjInput);
 }
 
 function setRptDays(n) {
