@@ -34,6 +34,7 @@ DATA_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.js
 INTERVAL     = 15 * 60  # seconds between daemon runs
 NEXTIVA_API  = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
 FALLBACK_ID  = "a2c5d0de-135f-11f1-8409-0050569d50ec"  # update if needed
+EXCLUDED_REPS = {"Marshall Johnson"}  # reps to hide from the scoreboard
 
 
 # ── Gmail Auth ────────────────────────────────────────────────────────────────
@@ -257,6 +258,8 @@ def parse_response(data):
                     talk_sec = int(t)
                 except Exception:
                     talk_sec = 0
+            if name in EXCLUDED_REPS:
+                continue
             if date not in date_map:
                 date_map[date] = {}
             date_map[date][name] = (calls, talk_sec)
