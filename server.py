@@ -430,8 +430,9 @@ def resolve_redirect(url):
         return ""
 
 
-NEXTIVA_API  = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
-FALLBACK_ID  = "a2c5d0de-135f-11f1-8409-0050569d50ec"
+NEXTIVA_API   = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
+FALLBACK_ID   = "a2c5d0de-135f-11f1-8409-0050569d50ec"
+EXCLUDED_REPS = {"Marshall Johnson"}
 
 
 def is_date_string(s):
@@ -495,6 +496,8 @@ def parse_response(data):
         if not name:
             name = f"Rep {i+1}"
 
+        if name in EXCLUDED_REPS:
+            continue
         if name not in all_rep_names:
             all_rep_names.append(name)
 
