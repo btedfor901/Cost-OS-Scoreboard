@@ -480,7 +480,6 @@ def parse_response(data):
     results_list = data["results"]
     user_emails  = data.get("filters", {}).get("users", [])
     date_map     = {}  # {date: {name: (calls, talk_sec)}}
-    active_reps  = []  # reps with at least one call in any date
 
     for i, series in enumerate(results_list):
         if not isinstance(series, dict):
@@ -523,17 +522,6 @@ def parse_response(data):
             if date not in date_map:
                 date_map[date] = {}
             date_map[date][name] = (calls, talk_sec)
-            if name not in active_reps:
-                active_reps.append(name)
-
-    # Pad today with 0s only for reps who have actual calls on other dates
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if active_reps:
-        if today_str not in date_map:
-            date_map[today_str] = {}
-        for name in active_reps:
-            if name not in date_map[today_str]:
-                date_map[today_str][name] = (0, 0)
 
     if not date_map:
         log.warning("No rep data found in response")
