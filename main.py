@@ -34,7 +34,7 @@ DATA_FILE    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.js
 INTERVAL     = 15 * 60  # seconds between daemon runs
 NEXTIVA_API  = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
 FALLBACK_ID  = "a2c5d0de-135f-11f1-8409-0050569d50ec"  # update if needed
-EXCLUDED_REPS = set()  # manual overrides if needed
+EXCLUDED_REPS = {"Marshall Johnson", "Jake Dahlquist", "majohnson0646450@nextiva.com", "jadahlquist1610044@nextiva.com"}  # reps to hide from the scoreboard
 
 
 # ── Gmail Auth ────────────────────────────────────────────────────────────────

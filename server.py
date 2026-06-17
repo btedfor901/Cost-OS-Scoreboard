@@ -432,7 +432,7 @@ def resolve_redirect(url):
 
 NEXTIVA_API   = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
 FALLBACK_ID   = "a2c5d0de-135f-11f1-8409-0050569d50ec"
-EXCLUDED_REPS = set()  # manual overrides if needed
+EXCLUDED_REPS = {"Marshall Johnson", "Jake Dahlquist", "majohnson0646450@nextiva.com", "jadahlquist1610044@nextiva.com"}
 
 
 def is_date_string(s):
@@ -480,6 +480,7 @@ def parse_response(data):
     results_list = data["results"]
     user_emails  = data.get("filters", {}).get("users", [])
     date_map     = {}  # {date: {name: (calls, talk_sec)}}
+    all_rep_names = []  # every rep seen in the API response, in order
 
     for i, series in enumerate(results_list):
         if not isinstance(series, dict):
@@ -497,6 +498,8 @@ def parse_response(data):
 
         if name in EXCLUDED_REPS:
             continue
+        if name not in all_rep_names:
+            all_rep_names.append(name)
 
         for row in series.get("data", series.get("rows", [])):
             if not isinstance(row, dict):
@@ -522,6 +525,15 @@ def parse_response(data):
             if date not in date_map:
                 date_map[date] = {}
             date_map[date][name] = (calls, talk_sec)
+
+    # Always include every known rep for today, even with 0 calls
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if all_rep_names:
+        if today_str not in date_map:
+            date_map[today_str] = {}
+        for name in all_rep_names:
+            if name not in date_map[today_str]:
+                date_map[today_str][name] = (0, 0)
 
     if not date_map:
         log.warning("No rep data found in response")
