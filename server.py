@@ -498,8 +498,6 @@ def parse_response(data):
 
         if name in EXCLUDED_REPS:
             continue
-        if name not in all_rep_names:
-            all_rep_names.append(name)
 
         for row in series.get("data", series.get("rows", [])):
             if not isinstance(row, dict):
@@ -525,6 +523,10 @@ def parse_response(data):
             if date not in date_map:
                 date_map[date] = {}
             date_map[date][name] = (calls, talk_sec)
+            # Only pad future zero-call days for reps who have made a real call
+            # before — brand-new reps stay off the board until their first call.
+            if name not in all_rep_names:
+                all_rep_names.append(name)
 
     # Always include every known rep for today, even with 0 calls
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")

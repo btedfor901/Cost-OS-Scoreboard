@@ -254,54 +254,6 @@
     .loading{text-align:center;color:var(--dim);padding:4rem 2rem;font-size:.875rem}
     .no-data{text-align:center;color:var(--dim);padding:3rem 2rem;font-size:.875rem}
 
-    /* ── The Challenger ── */
-    .challenger-row{background:linear-gradient(135deg,rgba(139,92,246,.09),rgba(139,92,246,.03),var(--raised));border-color:rgba(139,92,246,.35) !important;cursor:default !important}
-    .challenger-row:hover{transform:none !important;box-shadow:0 0 24px rgba(139,92,246,.1) !important;border-color:rgba(139,92,246,.45) !important}
-    .challenger-row.goal-beaten{background:linear-gradient(135deg,rgba(16,185,129,.09),rgba(16,185,129,.03),var(--raised)) !important;border-color:rgba(16,185,129,.35) !important}
-    .rank-dot.rc{background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:#fff;border:none;box-shadow:0 0 10px rgba(139,92,246,.4);font-size:.85rem}
-    .challenger-fill{height:100%;border-radius:9999px;background:linear-gradient(90deg,#8B5CF6,#7C3AED);width:100%;transition:width .9s cubic-bezier(.4,0,.2,1)}
-    .challenger-fill.beaten{background:linear-gradient(90deg,#10b981,#059669)}
-    .rep-row.beating-target{background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.02),var(--raised));border-color:rgba(16,185,129,.3) !important}
-    .rep-row.beating-target .rep-bar-fill{background:linear-gradient(90deg,#10b981,#059669) !important}
-    .beat-badge{font-size:.58rem;font-weight:700;color:#10b981;letter-spacing:.04em;flex-shrink:0}
-
-    /* ── Goal Progress card ── */
-    .goal-card{background:var(--card);border:1px solid rgba(139,92,246,.2);border-radius:var(--r);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--sh1)}
-    .goal-card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
-    .goal-card-title{font-size:.875rem;font-weight:600;display:flex;align-items:center;gap:.4rem}
-    .goal-card-sub{font-size:.7rem;color:var(--dim)}
-    .goal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.875rem}
-    @media(max-width:840px){.goal-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:480px){.goal-grid{grid-template-columns:1fr}}
-    .goal-metric{background:var(--raised);border:1px solid var(--border);border-radius:.75rem;padding:1rem;position:relative;overflow:hidden}
-    .goal-metric::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.25),transparent)}
-    .gm-label{font-size:.68rem;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
-    .gm-fraction{font-size:.875rem;font-weight:700;margin-bottom:.5rem;font-variant-numeric:tabular-nums;line-height:1.2}
-    .gm-fraction span{font-weight:400;color:var(--dim)}
-    .gm-bar-track{height:.375rem;background:var(--border);border-radius:9999px;overflow:hidden;margin-bottom:.4rem}
-    .gm-bar-fill{height:100%;border-radius:9999px;transition:width .9s cubic-bezier(.4,0,.2,1);width:0}
-    .gm-bar-fill.st-behind{background:linear-gradient(90deg,#EF4444,#DC2626)}
-    .gm-bar-fill.st-close{background:linear-gradient(90deg,#F59E0B,#F97316)}
-    .gm-bar-fill.st-track{background:var(--grad)}
-    .gm-bar-fill.st-crushed{background:linear-gradient(90deg,#10b981,#059669)}
-    .gm-pct{font-size:.65rem;color:var(--dim);font-weight:600;margin-bottom:.3rem}
-    .gm-msg{font-size:.7rem;font-weight:600;line-height:1.4}
-    .gm-msg.st-behind{color:#F97316}
-    .gm-msg.st-close{color:#F59E0B}
-    .gm-msg.st-track{color:var(--brand)}
-    .gm-msg.st-crushed{color:#10b981}
-    .gm-badge{display:inline-flex;align-items:center;gap:.25rem;font-size:.62rem;font-weight:700;padding:.15rem .45rem;border-radius:9999px;background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);margin-top:.3rem}
-
-    /* ── Pace Status Banner ── */
-    .pace-banner{display:flex;align-items:center;gap:.875rem;padding:.875rem 1.25rem;border-radius:.75rem;margin-bottom:1rem;border:1px solid;font-size:.82rem;font-weight:600}
-    .pace-ahead{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3);color:#10b981}
-    .pace-on{background:rgba(0,102,255,.08);border-color:rgba(0,102,255,.3);color:var(--brand)}
-    .pace-warn{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3);color:#F59E0B}
-    .pace-behind{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);color:#EF4444}
-    .pace-emoji{font-size:1.25rem;line-height:1;flex-shrink:0}
-    .pace-text strong{display:block;font-size:.82rem}
-    .pace-text small{font-size:.7rem;opacity:.75;font-weight:400}
-
     /* ── Footer ── */
     .costos-footer{
       text-align:center;padding:1.25rem 1rem 1.75rem;
@@ -369,146 +321,6 @@ let adminPin     = sessionStorage.getItem('cp') || '';
 let customFrom   = '', customTo = '';
 let _scrapedAtMs = null;
 let _firstRender = true;
-
-// ── The Challenger goals ───────────────────────────────────────────────────────
-const GOALS = { dailyCalls: 110, dailyTalkSec: 10800, monthlyDemos: 5, avgTalkSec: 120 };
-const WORK_START_H = 8;   // 8 AM local
-const WORK_END_H   = 17;  // 5 PM local
-
-function getDaysInRange(start, end) {
-  return Math.round((new Date(end+'T00:00:00') - new Date(start+'T00:00:00')) / 86400000) + 1;
-}
-function calcChallengerTargets(start, end) {
-  const days = getDaysInRange(start, end);
-  return { calls: GOALS.dailyCalls * days, talkSec: GOALS.dailyTalkSec * days, avgSec: GOALS.avgTalkSec, demos: GOALS.monthlyDemos, days };
-}
-function goalStatus(pct) {
-  if (pct >= 1)    return 'st-crushed';
-  if (pct >= 0.9)  return 'st-close';
-  if (pct >= 0.65) return 'st-track';
-  return 'st-behind';
-}
-function motivationalMsg(actual, goal, label, isTime) {
-  const pct  = goal > 0 ? actual / goal : 1;
-  const diff = Math.abs(goal - actual);
-  const d    = isTime ? fmtSec(Math.round(diff)) : Math.round(diff).toLocaleString();
-  if (pct >= 1)   return { st: 'st-crushed', txt: `🏆 ${isTime ? fmtSec(Math.round(actual-goal)) : Math.round(actual-goal).toLocaleString()} ${label} above target!` };
-  if (pct >= 0.9) return { st: 'st-close',   txt: `🔥 Almost there — ${d} ${label} to go!` };
-  if (pct >= 0.65)return { st: 'st-track',   txt: `⚡ ${d} ${label} behind target` };
-  return              { st: 'st-behind',  txt: `💪 Needs ${d} more ${label}` };
-}
-
-// ── Dynamic Challenger progression ────────────────────────────────────────────
-function getChallengerDayProgress() {
-  const now = new Date();
-  const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
-  const startMs = new Date(y, mo, d, WORK_START_H, 0, 0).getTime();
-  const endMs   = new Date(y, mo, d, WORK_END_H,   0, 0).getTime();
-  const nowMs   = now.getTime();
-  if (nowMs <= startMs) return 0;
-  if (nowMs >= endMs)   return 1;
-  return (nowMs - startMs) / (endMs - startMs);
-}
-function getChallengerVarianceFactor() {
-  // Shifts every 30 min — makes it feel like a real person surging or slowing
-  const now = new Date();
-  const bucket = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30);
-  // Keep seed small so Math.sin has enough precision for the fractional part
-  const seed = (now.getDate() * 7 + (now.getMonth() + 1) * 11 + (now.getFullYear() % 100) * 3 + bucket * 19) % 1009;
-  let x = Math.sin(seed + 1) * 43758.5453;
-  x = x - Math.floor(x); // 0–1
-  return 0.90 + x * 0.20; // ±10% variance
-}
-function getDynamicChallengerForToday() {
-  const progress = getChallengerDayProgress();
-  const variance = getChallengerVarianceFactor();
-  const factor   = progress * variance;
-  return {
-    calls:    Math.round(GOALS.dailyCalls   * factor),
-    talkSec:  Math.round(GOALS.dailyTalkSec * factor),
-    avgSec:   GOALS.avgTalkSec,
-    progress,
-    variance,
-  };
-}
-function getPaceStatus(repCalls, challCalls) {
-  if (challCalls <= 0) return null;
-  const ratio = repCalls / challCalls;
-  if (ratio >= 1.10) return { emoji: '🔥', label: 'Ahead of Challenger', cls: 'pace-ahead' };
-  if (ratio >= 0.95) return { emoji: '✅', label: 'On Pace',             cls: 'pace-on'   };
-  if (ratio >= 0.80) return { emoji: '⚠️', label: 'Slightly Behind',     cls: 'pace-warn'  };
-  return               { emoji: '🚨', label: 'Falling Behind',           cls: 'pace-behind'};
-}
-function paceStatusHTML(reps, dynChall) {
-  if (!dynChall || dynChall.progress <= 0) return '';
-  const totalCalls = reps.reduce((a, r) => a + r.totalCalls, 0);
-  const ps = getPaceStatus(totalCalls, dynChall.calls);
-  if (!ps) return '';
-  const challPct  = Math.round(dynChall.progress * 100);
-  const challDisp = dynChall.calls === 0 ? '0 calls yet' : `${dynChall.calls} calls`;
-  return `<div class="pace-banner ${ps.cls}" id="pace-banner">
-    <span class="pace-emoji">${ps.emoji}</span>
-    <div class="pace-text"><strong>${ps.label}</strong><small>Challenger is at ${challDisp} · ${challPct}% through the day</small></div>
-  </div>`;
-}
-
-function challengerRepRow(goalVal, isTime, beaten, dynVal, barWidthPct) {
-  const displayVal = dynVal != null ? dynVal : goalVal;
-  const disp = isTime ? fmtSec(displayVal) : displayVal.toLocaleString();
-  const beatCls   = beaten ? ' goal-beaten' : '';
-  const beatLabel = beaten ? '<span class="beat-badge">✓ BEATEN</span>' : '<span style="font-size:.6rem;font-weight:700;color:#8B5CF6;letter-spacing:.04em;flex-shrink:0">GOAL</span>';
-  const fillCls   = beaten ? 'challenger-fill beaten' : 'challenger-fill';
-  const barW      = barWidthPct != null ? barWidthPct : 100;
-  const subText   = dynVal != null
-    ? `${Math.round((dynVal / (goalVal || 1)) * 100)}% of daily goal`
-    : 'Daily Goal Target';
-  return `<div class="rep-row challenger-row${beatCls}" style="cursor:default">
-    <div class="rank-dot rc">🎯</div>
-    <div class="avatar" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);font-size:1rem;line-height:1">🤖</div>
-    <div class="rep-mid">
-      <div class="rep-name"><span class="rep-name-text">The Challenger</span>${beatLabel}</div>
-      <div class="rep-bar-track"><div class="${fillCls}" data-chall-bar style="width:${barW}%"></div></div>
-      <div style="font-size:.62rem;color:#A78BFA;margin-top:.2rem;font-weight:500" data-chall-sub>${subText}</div>
-    </div>
-    <div class="rep-val" style="color:#A78BFA;-webkit-text-fill-color:#A78BFA" data-chall-val>${disp}</div>
-  </div>`;
-}
-function goalProgressHTML(reps, ct, demosData, tab) {
-  const totalCalls = reps.reduce((a,r)=>a+r.totalCalls,0);
-  const totalTalk  = reps.reduce((a,r)=>a+r.totalTalkTimeSec,0);
-  const avgSec     = totalCalls ? Math.round(totalTalk/totalCalls) : 0;
-  const demos      = demosData ? demosData.total : 0;
-  function block(label, actual, goal, isTime) {
-    const pct     = goal > 0 ? Math.min(actual/goal, 1) : 1;
-    const pctDisp = Math.round(pct*100);
-    const st      = goalStatus(pct);
-    const msg     = motivationalMsg(actual, goal, label, isTime);
-    const aDisp   = isTime ? fmtSec(actual)   : actual.toLocaleString();
-    const gDisp   = isTime ? fmtSec(goal)     : goal.toLocaleString();
-    const badge   = pct >= 1 ? `<div class="gm-badge">🏆 Goal Crushed!</div>` : '';
-    return `<div class="goal-metric">
-      <div class="gm-label">${label}</div>
-      <div class="gm-fraction">${aDisp} <span>/ ${gDisp}</span></div>
-      <div class="gm-bar-track"><div class="gm-bar-fill ${st}" data-pct="${pctDisp}" style="width:0"></div></div>
-      <div class="gm-pct">${pctDisp}% of goal</div>
-      <div class="gm-msg ${st}">${msg.txt}</div>
-      ${badge}
-    </div>`;
-  }
-  const dayLabel = ct.days === 1 ? "Today's targets" : `${ct.days}-day targets`;
-  return `<div class="goal-card">
-    <div class="goal-card-hd">
-      <div class="goal-card-title"><span style="font-size:1.1rem">🎯</span> vs The Challenger</div>
-      <div class="goal-card-sub">${dayLabel}</div>
-    </div>
-    <div class="goal-grid">
-      ${block('📞 Calls', totalCalls, ct.calls, false)}
-      ${block('🎙 Talk Time', totalTalk, ct.talkSec, true)}
-      ${block('⏱ Avg Per Call', avgSec, ct.avgSec, true)}
-      ${block('📅 Monthly Demos', demos, ct.demos, false)}
-    </div>
-  </div>`;
-}
 
 // ── Count-up animation ────────────────────────────────────────────────────────
 function countUp(el, target) {
@@ -733,19 +545,10 @@ function render() {
 
   const byCall = [...reps].sort((a, b) => b.totalCalls - a.totalCalls);
   const byTalk = [...reps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
+  const maxCall = byCall[0]?.totalCalls || 1;
+  const maxTalk = byTalk[0]?.totalTalkTimeSec || 1;
   const dayWins = calcDayWins(DATA.history, start, end);
   const streaks = calcStreaks(DATA.history);
-
-  const ct        = calcChallengerTargets(start, end);
-  const dynChall  = activeTab === 'today' ? getDynamicChallengerForToday() : null;
-  const challCalls = dynChall ? dynChall.calls   : ct.calls;
-  const challTalk  = dynChall ? dynChall.talkSec : ct.talkSec;
-  const maxCall   = Math.max(byCall[0]?.totalCalls || 0, ct.calls);
-  const maxTalk   = Math.max(byTalk[0]?.totalTalkTimeSec || 0, ct.talkSec);
-  const callsBeat = dynChall ? (challCalls > 0 && totalCalls > challCalls) : totalCalls >= ct.calls;
-  const talkBeat  = dynChall ? (challTalk  > 0 && totalTalk  > challTalk)  : totalTalk  >= ct.talkSec;
-  const challCallBarPct = dynChall ? Math.round((challCalls / (maxCall || 1)) * 100) : null;
-  const challTalkBarPct = dynChall ? Math.round((challTalk  / (maxTalk || 1)) * 100) : null;
 
   // Store for modal access
   REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
@@ -753,14 +556,13 @@ function render() {
   // Rank-based blue palette: #1 = brand blue, stepping darker
   const rankColors = ['#0c7dc6','#0a69a8','#08558a','#06416b','#053459','#04294a'];
 
-  function repRow(r, rank, value, maxVal, isTime, winDays = 0, prevRanked = null, beating = false) {
+  function repRow(r, rank, value, maxVal, isTime, winDays = 0, prevRanked = null) {
     const pct     = Math.round((value / maxVal) * 100);
     const color   = rankColors[Math.min(rank - 1, rankColors.length - 1)];
     const disp    = isTime ? fmtSec(value) : value.toLocaleString();
     const rankCls = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
     const safeName = r.name.replace(/'/g, "\\'");
-    let rowCls = rank === 1 ? 'rep-row rank-1' : 'rep-row';
-    if (beating) rowCls += ' beating-target';
+    const rowCls   = rank === 1 ? 'rep-row rank-1' : 'rep-row';
     const winLabel = winDays >= 2
       ? `<div class="win-streak">${activeTab === 'today' ? '🔥' : '🏆'} ${isTime ? 'Talk time' : 'Calls'} ${activeTab === 'today' ? `${winDays}-day streak` : `leader — ${winDays} days`}</div>`
       : '';
@@ -775,7 +577,6 @@ function render() {
         else if (diff < 0) rankBadge = `<span class="rank-dn">▼${Math.abs(diff)}</span>`;
       }
     }
-    if (beating) rankBadge += `<span class="beat-badge">🏆</span>`;
     return `<div class="${rowCls}" data-rep="${r.name.replace(/"/g, '&quot;')}" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
@@ -834,26 +635,20 @@ function render() {
       <div class="stat-card"><div class="stat-label">Active Reps</div><div class="stat-value" data-num="${activeReps}">${activeReps}</div></div>
     </div>
 
-    ${goalProgressHTML(reps, ct, DATA.demos, activeTab)}
-
-    ${paceStatusHTML(reps, dynChall)}
-
     <div class="lb-grid">
       <div class="lb-card" id="lb-calls">
         <div class="lb-header">
           <span class="lb-title">Total Calls</span>
           <span class="lb-badge">${byCall.length} reps</span>
         </div>
-        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0), prevByCall, callsBeat)).join('')}
-        ${challengerRepRow(ct.calls, false, callsBeat, dynChall ? challCalls : null, challCallBarPct)}
+        ${byCall.map((r, i) => repRow(r, i + 1, r.totalCalls, maxCall, false, activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0), prevByCall)).join('')}
       </div>
       <div class="lb-card" id="lb-talk">
         <div class="lb-header">
           <span class="lb-title">Total Talk Time</span>
           <span class="lb-badge">${byTalk.length} reps</span>
         </div>
-        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0), prevByTalk, talkBeat)).join('')}
-        ${challengerRepRow(ct.talkSec, true, talkBeat, dynChall ? challTalk : null, challTalkBarPct)}
+        ${byTalk.map((r, i) => repRow(r, i + 1, r.totalTalkTimeSec, maxTalk, true, activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0), prevByTalk)).join('')}
       </div>
     </div>
 
@@ -875,11 +670,6 @@ function render() {
             <div class="avg-sub">${sub}</div>
           </div>`;
         }).join('')}
-        <div class="avg-inner" style="border-color:rgba(139,92,246,.3);background:linear-gradient(135deg,rgba(139,92,246,.07),rgba(139,92,246,.02),var(--raised))">
-          <div class="avg-name" style="color:#A78BFA">🤖 The Challenger</div>
-          <div class="avg-value" style="color:#A78BFA;-webkit-text-fill-color:#A78BFA">${avgMode === 'talk' ? fmtSec(ct.avgSec) : (dynChall ? dynChall.calls : ct.calls).toLocaleString()}</div>
-          <div class="avg-sub">${dynChall && avgMode !== 'talk' ? 'current pace' : 'goal target'}</div>
-        </div>
       </div>
     </div>
 
@@ -896,11 +686,6 @@ function render() {
             <div class="demo-rep-count">${r.demos}</div>
             <div class="demo-rep-label">demos this month</div>
           </div>`).join('')}
-        <div class="demo-rep" style="border-color:rgba(139,92,246,.3);background:linear-gradient(135deg,rgba(139,92,246,.07),rgba(139,92,246,.02),var(--raised))">
-          <div class="demo-rep-name" style="color:#A78BFA">🤖 The Challenger</div>
-          <div class="demo-rep-count" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);-webkit-background-clip:text;background-clip:text">${ct.demos}</div>
-          <div class="demo-rep-label">monthly goal</div>
-        </div>
       </div>
     </div>` : ''}`;
 
@@ -1122,18 +907,10 @@ function patchUpdate() {
   const avgTalk    = totalCalls ? Math.round(totalTalk / totalCalls) : 0;
   const byCall     = [...reps].sort((a, b) => b.totalCalls - a.totalCalls);
   const byTalk     = [...reps].sort((a, b) => b.totalTalkTimeSec - a.totalTalkTimeSec);
+  const maxCall    = byCall[0]?.totalCalls || 1;
+  const maxTalk    = byTalk[0]?.totalTalkTimeSec || 1;
   const dayWins    = calcDayWins(DATA.history, start, end);
   const streaks    = calcStreaks(DATA.history);
-  const ct2          = calcChallengerTargets(start, end);
-  const dynChall2    = activeTab === 'today' ? getDynamicChallengerForToday() : null;
-  const challCalls2  = dynChall2 ? dynChall2.calls   : ct2.calls;
-  const challTalk2   = dynChall2 ? dynChall2.talkSec : ct2.talkSec;
-  const maxCall      = Math.max(byCall[0]?.totalCalls || 0, ct2.calls);
-  const maxTalk      = Math.max(byTalk[0]?.totalTalkTimeSec || 0, ct2.talkSec);
-  const callsBeat2   = dynChall2 ? (challCalls2 > 0 && totalCalls > challCalls2) : totalCalls >= ct2.calls;
-  const talkBeat2    = dynChall2 ? (challTalk2  > 0 && totalTalk  > challTalk2)  : totalTalk  >= ct2.talkSec;
-  const challCallBarPct2 = dynChall2 ? Math.round((challCalls2 / (maxCall || 1)) * 100) : null;
-  const challTalkBarPct2 = dynChall2 ? Math.round((challTalk2  / (maxTalk || 1)) * 100) : null;
 
   REPS_DATA = { reps, byCall, byTalk, totalCalls, totalTalk, avgTalk };
 
@@ -1166,14 +943,13 @@ function patchUpdate() {
 
   const rankColors = ['#0c7dc6','#0a69a8','#08558a','#06416b','#053459','#04294a'];
 
-  function repRowHTML(r, rank, value, maxVal, isTime, winDays, prevRanked, beating) {
+  function repRowHTML(r, rank, value, maxVal, isTime, winDays, prevRanked) {
     const pct      = Math.round((value / maxVal) * 100);
     const color    = rankColors[Math.min(rank - 1, rankColors.length - 1)];
     const disp     = isTime ? fmtSec(value) : value.toLocaleString();
     const rankCls  = rank === 1 ? 'r1' : rank === 2 ? 'r2' : rank === 3 ? 'r3' : '';
     const safeName = r.name.replace(/'/g, "\\'");
-    let rowCls = rank === 1 ? 'rep-row rank-1' : 'rep-row';
-    if (beating) rowCls += ' beating-target';
+    const rowCls   = rank === 1 ? 'rep-row rank-1' : 'rep-row';
     const winLabel = winDays >= 2
       ? `<div class="win-streak">${activeTab === 'today' ? '🔥' : '🏆'} ${isTime ? 'Talk time' : 'Calls'} ${activeTab === 'today' ? `${winDays}-day streak` : `leader — ${winDays} days`}</div>`
       : '';
@@ -1187,7 +963,6 @@ function patchUpdate() {
         else if (diff < 0) rankBadge = `<span class="rank-dn">▼${Math.abs(diff)}</span>`;
       }
     }
-    if (beating) rankBadge += `<span class="beat-badge">🏆</span>`;
     return `<div class="${rowCls}" data-rep="${r.name.replace(/"/g, '&quot;')}" onclick="openRepModal('${safeName}')">
       <div class="rank-dot ${rankCls}">${rank}</div>
       <div class="avatar" style="background:${color}">${initials(r.name)}</div>
@@ -1200,12 +975,13 @@ function patchUpdate() {
     </div>`;
   }
 
-  function patchLeaderboard(lbId, sorted, maxVal, isTime, prevRanked, winFn, beating) {
+  function patchLeaderboard(lbId, sorted, maxVal, isTime, prevRanked, winFn) {
     const card = document.getElementById(lbId);
     if (!card) return;
     const currentOrder = [...card.querySelectorAll('[data-rep]')].map(r => r.dataset.rep);
     const newOrder     = sorted.map(r => r.name);
     if (JSON.stringify(currentOrder) === JSON.stringify(newOrder)) {
+      // Same order — patch values and bars in-place, no DOM rebuild
       sorted.forEach(r => {
         const row = [...card.querySelectorAll('[data-rep]')].find(el => el.dataset.rep === r.name);
         if (!row) return;
@@ -1219,32 +995,15 @@ function patchUpdate() {
           bar.style.width = pct + '%';
         }
       });
-      // Update challenger row beaten state and dynamic value
-      const cRow = card.querySelector('.challenger-row');
-      if (cRow) {
-        beating ? cRow.classList.add('goal-beaten') : cRow.classList.remove('goal-beaten');
-        if (dynChall2) {
-          const dynDisplayVal = isTime ? challTalk2 : challCalls2;
-          const dynGoalVal    = isTime ? ct2.talkSec : ct2.calls;
-          const dynBarPct     = isTime ? challTalkBarPct2 : challCallBarPct2;
-          const chalValEl = cRow.querySelector('[data-chall-val]');
-          if (chalValEl) chalValEl.textContent = isTime ? fmtSec(dynDisplayVal) : dynDisplayVal.toLocaleString();
-          const chalBarEl = cRow.querySelector('[data-chall-bar]');
-          if (chalBarEl) chalBarEl.style.width = (dynBarPct || 0) + '%';
-          const chalSubEl = cRow.querySelector('[data-chall-sub]');
-          if (chalSubEl) chalSubEl.textContent = Math.round((dynDisplayVal / (dynGoalVal || 1)) * 100) + '% of daily goal';
-        }
-      }
     } else {
-      const challDisplayVal2 = isTime ? challTalk2 : challCalls2;
-      const challBarW2       = isTime ? challTalkBarPct2 : challCallBarPct2;
+      // Rank order changed — crossfade only the rep rows
       const newRows = sorted.map((r, i) =>
-        repRowHTML(r, i + 1, isTime ? r.totalTalkTimeSec : r.totalCalls, maxVal, isTime, winFn(r), prevRanked, beating)
-      ).join('') + challengerRepRow(isTime ? ct2.talkSec : ct2.calls, isTime, beating, dynChall2 ? challDisplayVal2 : null, challBarW2);
+        repRowHTML(r, i + 1, isTime ? r.totalTalkTimeSec : r.totalCalls, maxVal, isTime, winFn(r), prevRanked)
+      ).join('');
       card.style.transition = 'opacity .15s ease';
       card.style.opacity    = '0';
       setTimeout(() => {
-        [...card.querySelectorAll('[data-rep], .challenger-row')].forEach(r => r.remove());
+        [...card.querySelectorAll('[data-rep]')].forEach(r => r.remove());
         card.insertAdjacentHTML('beforeend', newRows);
         requestAnimationFrame(() => requestAnimationFrame(() => { card.style.opacity = '1'; }));
       }, 150);
@@ -1252,21 +1011,9 @@ function patchUpdate() {
   }
 
   patchLeaderboard('lb-calls', byCall, maxCall, false, prevByCall,
-    r => activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0), callsBeat2);
+    r => activeTab === 'today' ? (streaks[r.name]?.calls || 0) : (dayWins[r.name]?.calls || 0));
   patchLeaderboard('lb-talk',  byTalk, maxTalk, true,  prevByTalk,
-    r => activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0), talkBeat2);
-
-  // Update pace banner
-  const paceBannerEl = document.getElementById('pace-banner');
-  if (paceBannerEl && dynChall2) {
-    const ps = getPaceStatus(totalCalls, dynChall2.calls);
-    if (ps) {
-      paceBannerEl.className = `pace-banner ${ps.cls}`;
-      const challPct  = Math.round(dynChall2.progress * 100);
-      const challDisp = dynChall2.calls === 0 ? '0 calls yet' : `${dynChall2.calls} calls`;
-      paceBannerEl.innerHTML = `<span class="pace-emoji">${ps.emoji}</span><div class="pace-text"><strong>${ps.label}</strong><small>Challenger is at ${challDisp} · ${challPct}% through the day</small></div>`;
-    }
-  }
+    r => activeTab === 'today' ? (streaks[r.name]?.talk || 0) : (dayWins[r.name]?.talk || 0));
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
