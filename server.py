@@ -432,7 +432,7 @@ def resolve_redirect(url):
 
 NEXTIVA_API   = "https://analytics.nextiva.com/nextos/reports/public/{report_id}"
 FALLBACK_ID   = "a2c5d0de-135f-11f1-8409-0050569d50ec"
-EXCLUDED_REPS = {"Marshall Johnson", "Jake Dahlquist", "majohnson0646450@nextiva.com", "jadahlquist1610044@nextiva.com"}
+EXCLUDED_REPS = {"Marshall Johnson", "Jake Dahlquist", "Giovanni Orfin", "majohnson0646450@nextiva.com", "jadahlquist1610044@nextiva.com", "giorfin5106591@nextiva.com"}
 
 
 def is_date_string(s):
