@@ -11,6 +11,7 @@ Environment variables (set in Railway):
 """
 
 import os
+import copy
 import json
 import re
 import base64
@@ -190,50 +191,48 @@ def adjust_rep():
     except Exception as e:
         return jsonify({"error": f"Could not read data.json: {e}"}), 500
 
-    changed = False
-
-    # Adjust today's reps
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if date_str == today_str and data.get("today", {}).get("reps"):
-        for r in data["today"]["reps"]:
-            if r["name"] == rep_name:
-                r["totalCalls"]       = max(0, r["totalCalls"] + adj_calls)
-                r["totalTalkTimeSec"] = max(0, r["totalTalkTimeSec"] + adj_talk_sec)
-                r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
-                r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
-                                         if r["totalCalls"] else 0)
-                changed = True
-
-    # Adjust matching history entry
-    for snap in data.get("history", []):
-        if snap["date"] == date_str:
-            for r in snap.get("reps", []):
-                if r["name"] == rep_name:
-                    r["totalCalls"]       = max(0, r["totalCalls"] + adj_calls)
-                    r["totalTalkTimeSec"] = max(0, r["totalTalkTimeSec"] + adj_talk_sec)
-                    r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
-                    r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
-                                             if r["totalCalls"] else 0)
-                    changed = True
-
-    if not changed:
+    # Make sure the rep exists for that date before saving anything
+    exists = any(r["name"] == rep_name
+                 for snap in data.get("history", []) if snap["date"] == date_str
+                 for r in snap.get("reps", []))
+    if not exists and data.get("today", {}).get("reportDate") == date_str:
+        exists = any(r["name"] == rep_name for r in data["today"].get("reps", []))
+    if not exists:
         return jsonify({"error": f"Rep '{rep_name}' not found for date {date_str}"}), 404
+
+    # Persist adjustment (cumulative per rep/day) — this is the source of truth
+    # that overrides the scraper's numbers for that day.
+    adj_store = _load_adjustments()
+    key = f"{date_str}||{rep_name}"
+    existing_adj = adj_store.get(key, {"rep": rep_name, "date": date_str,
+                                       "adjustCalls": 0, "adjustSeconds": 0})
+
+    # Legacy records (saved before raw values were tracked) already have the
+    # previous adjustment baked in — back it out to recover the raw values.
+    legacy = [r for snap in data.get("history", []) if snap["date"] == date_str
+              for r in snap.get("reps", []) if r["name"] == rep_name]
+    if data.get("today", {}).get("reportDate") == date_str:
+        legacy += [r for r in data["today"].get("reps", []) if r["name"] == rep_name]
+    for r in legacy:
+        if "rawCalls" not in r:
+            r["rawCalls"] = max(0, r["totalCalls"] - existing_adj["adjustCalls"])
+        if "rawTalkTimeSec" not in r:
+            r["rawTalkTimeSec"] = max(0, r["totalTalkTimeSec"] - existing_adj["adjustSeconds"])
+
+    existing_adj["adjustCalls"]   += adj_calls
+    existing_adj["adjustSeconds"] += adj_talk_sec
+    adj_store[key] = existing_adj
+    _save_adjustments(adj_store)
+
+    # Re-apply all adjustments against raw scraped values (idempotent)
+    _apply_adjustments_to(data)
+    _rebuild_weekly(data)
 
     try:
         with open(DATA_FILE, "w") as f:
             json.dump(data, f, indent=2)
     except Exception as e:
         return jsonify({"error": f"Could not write data.json: {e}"}), 500
-
-    # Persist adjustment so future scrapes re-apply it automatically
-    adj_store = _load_adjustments()
-    key = f"{date_str}||{rep_name}"
-    existing_adj = adj_store.get(key, {"rep": rep_name, "date": date_str,
-                                       "adjustCalls": 0, "adjustSeconds": 0})
-    existing_adj["adjustCalls"]   += adj_calls
-    existing_adj["adjustSeconds"] += adj_talk_sec
-    adj_store[key] = existing_adj
-    _save_adjustments(adj_store)
 
     log.info("Adjusted %s on %s: calls%+d, talk%+ds (persisted)", rep_name, date_str, adj_calls, adj_talk_sec)
     return jsonify({"ok": True, "rep": rep_name, "date": date_str,
@@ -611,35 +610,79 @@ def _push_adjustments_to_github(content):
         log.warning("GitHub push error: %s", e)
 
 
+def _patch_rep(r, adj_calls, adj_talk_sec):
+    """Set a rep's totals to (raw scraped value + adjustment).
+
+    The raw scraped values are kept in rawCalls / rawTalkTimeSec so that
+    re-applying is idempotent — an adjustment can never stack on itself,
+    no matter how many times a scrape or adjustment runs.
+    """
+    if "rawCalls" not in r:
+        r["rawCalls"] = r["totalCalls"]
+    if "rawTalkTimeSec" not in r:
+        r["rawTalkTimeSec"] = r["totalTalkTimeSec"]
+    r["totalCalls"]       = max(0, r["rawCalls"] + adj_calls)
+    r["totalTalkTimeSec"] = max(0, r["rawTalkTimeSec"] + adj_talk_sec)
+    r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
+    r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
+                             if r["totalCalls"] else 0)
+
+
 def _apply_adjustments_to(data):
-    """Apply all stored adjustments to a data dict in place."""
+    """Apply all stored adjustments to a data dict in place (idempotent).
+
+    Returns the set of (date, rep) keys that were matched.
+    """
     adj = _load_adjustments()
+    matched = set()
     if not adj:
-        return
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        return matched
     for entry in adj.values():
         date_str     = entry["date"]
         rep_name     = entry["rep"]
         adj_calls    = entry["adjustCalls"]
         adj_talk_sec = entry["adjustSeconds"]
 
-        def _patch(r):
-            r["totalCalls"]       = max(0, r["totalCalls"] + adj_calls)
-            r["totalTalkTimeSec"] = max(0, r["totalTalkTimeSec"] + adj_talk_sec)
-            r["totalTalkTimeStr"] = fmt_dur(r["totalTalkTimeSec"])
-            r["avgTalkTimeSec"]   = (round(r["totalTalkTimeSec"] / r["totalCalls"])
-                                     if r["totalCalls"] else 0)
-
-        if date_str == today_str:
+        # Collect each matching rep dict once (today and history may share objects)
+        targets = {}
+        if data.get("today", {}).get("reportDate", date_str) == date_str:
             for r in data.get("today", {}).get("reps", []):
                 if r["name"] == rep_name:
-                    _patch(r)
-
+                    targets[id(r)] = r
         for snap in data.get("history", []):
             if snap["date"] == date_str:
                 for r in snap.get("reps", []):
                     if r["name"] == rep_name:
-                        _patch(r)
+                        targets[id(r)] = r
+
+        for r in targets.values():
+            _patch_rep(r, adj_calls, adj_talk_sec)
+        if targets:
+            matched.add((date_str, rep_name))
+    return matched
+
+
+def _rebuild_weekly(data):
+    """Recompute the weekly rollup from (already adjusted) history."""
+    weekly_snaps = data.get("history", [])[:7]
+    weekly_reps  = {}
+    for snap in weekly_snaps:
+        for r in snap["reps"]:
+            name = r["name"]
+            if name not in weekly_reps:
+                weekly_reps[name] = {"name": name, "totalCalls": 0,
+                                     "totalTalkTimeSec": 0, "daysActive": 0}
+            weekly_reps[name]["totalCalls"]       += r["totalCalls"]
+            weekly_reps[name]["totalTalkTimeSec"] += r["totalTalkTimeSec"]
+            weekly_reps[name]["daysActive"]       += 1
+    for wr in weekly_reps.values():
+        wr["avgTalkTimeSec"]   = (round(wr["totalTalkTimeSec"] / wr["totalCalls"])
+                                  if wr["totalCalls"] else 0)
+        wr["totalTalkTimeStr"] = fmt_dur(wr["totalTalkTimeSec"])
+    dates = sorted(s["date"] for s in weekly_snaps)
+    data["weekly"] = {"reps": list(weekly_reps.values()),
+                      "daysCount": len(weekly_snaps),
+                      "dateRange": f"{dates[0]} to {dates[-1]}" if dates else ""}
 
 
 def fmt_dur(secs):
@@ -752,44 +795,27 @@ def run_scrape():
 
     hist_map = {s["date"]: s for s in existing.get("history", [])}
     for date, reps in all_dates.items():
-        hist_map[date] = {"date": date, "reps": reps}
+        # Deep copy so today's reps and history's reps are separate objects
+        hist_map[date] = {"date": date, "reps": copy.deepcopy(reps)}
     history = sorted(hist_map.values(), key=lambda x: x["date"], reverse=True)[:90]
-
-    weekly_snaps = history[:7]
-    weekly_reps  = {}
-    for snap in weekly_snaps:
-        for r in snap["reps"]:
-            name = r["name"]
-            if name not in weekly_reps:
-                weekly_reps[name] = {"name": name, "totalCalls": 0,
-                                     "totalTalkTimeSec": 0, "daysActive": 0}
-            weekly_reps[name]["totalCalls"]       += r["totalCalls"]
-            weekly_reps[name]["totalTalkTimeSec"] += r["totalTalkTimeSec"]
-            weekly_reps[name]["daysActive"]       += 1
-    for wr in weekly_reps.values():
-        wr["avgTalkTimeSec"]   = (round(wr["totalTalkTimeSec"] / wr["totalCalls"])
-                                  if wr["totalCalls"] else 0)
-        wr["totalTalkTimeStr"] = fmt_dur(wr["totalTalkTimeSec"])
 
     demos       = fetch_demos_sheet()
     demos_total = sum(demos.values())
     demos_reps  = [{"name": k, "demos": v} for k, v in demos.items()]
 
-    dates = sorted(s["date"] for s in weekly_snaps) if weekly_snaps else []
     data  = {
         "scrapedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "reportUrl": f"https://analytics.nextiva.com/external-reports.html#{report_id}",
-        "today":  {"reps": today_reps, "reportDate": today_str},
-        "weekly": {"reps": list(weekly_reps.values()),
-                   "daysCount": len(weekly_snaps),
-                   "dateRange": f"{dates[0]} to {dates[-1]}" if dates else ""},
+        "today":  {"reps": copy.deepcopy(today_reps), "reportDate": today_str},
+        "weekly": {},
         "history": history,
         "demos":   {"total": demos_total, "reps": demos_reps},
         "intraday": intraday_data,
     }
 
-    # Re-apply any manual adjustments on top of fresh Nextiva data
+    # Manual adjustments override the scraper: always raw scraped + adjustment
     _apply_adjustments_to(data)
+    _rebuild_weekly(data)
 
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
