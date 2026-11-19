@@ -191,14 +191,8 @@ def adjust_rep():
     except Exception as e:
         return jsonify({"error": f"Could not read data.json: {e}"}), 500
 
-    # Make sure the rep exists for that date before saving anything
-    exists = any(r["name"] == rep_name
-                 for snap in data.get("history", []) if snap["date"] == date_str
-                 for r in snap.get("reps", []))
-    if not exists and data.get("today", {}).get("reportDate") == date_str:
-        exists = any(r["name"] == rep_name for r in data["today"].get("reps", []))
-    if not exists:
-        return jsonify({"error": f"Rep '{rep_name}' not found for date {date_str}"}), 404
+    # If the rep has no scraped data for that date, _apply_adjustments_to
+    # creates a zero record for them, so the manual numbers still take effect.
 
     # Persist adjustment (cumulative per rep/day) — this is the source of truth
     # that overrides the scraper's numbers for that day.
@@ -655,10 +649,28 @@ def _apply_adjustments_to(data):
                     if r["name"] == rep_name:
                         targets[id(r)] = r
 
+        # Rep has no scraped data for that day (e.g. Nextiva missed it) —
+        # create a zero record so the manual numbers still show up.
+        if not targets:
+            history = data.setdefault("history", [])
+            snap = next((s for s in history if s["date"] == date_str), None)
+            if snap is None:
+                snap = {"date": date_str, "reps": []}
+                history.append(snap)
+                history.sort(key=lambda x: x["date"], reverse=True)
+            new_rep = make_rep(rep_name, 0, 0)
+            new_rep["date"] = date_str
+            snap.setdefault("reps", []).append(new_rep)
+            targets[id(new_rep)] = new_rep
+            today = data.get("today")
+            if today is not None and today.get("reportDate") == date_str:
+                today_rep = copy.deepcopy(new_rep)
+                today.setdefault("reps", []).append(today_rep)
+                targets[id(today_rep)] = today_rep
+
         for r in targets.values():
             _patch_rep(r, adj_calls, adj_talk_sec)
-        if targets:
-            matched.add((date_str, rep_name))
+        matched.add((date_str, rep_name))
     return matched
 
 
